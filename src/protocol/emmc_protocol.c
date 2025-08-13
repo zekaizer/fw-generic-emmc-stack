@@ -359,9 +359,13 @@ emmc_result_t emmc_optimize_performance(void)
     /* Determine optimal timing mode based on card capabilities */
     target_mode = EMMC_MODE_SDR; /* Start with legacy */
     
-    if (ext_csd->card_type & 0x04) {
-        /* Supports HS200 */
-        target_mode = EMMC_MODE_HS200;
+    /* Check for Enhanced Strobe support (highest priority) */
+    if ((ext_csd->card_type & 0x04) && (ext_csd->strobe_support & 0x01)) {
+        /* Supports HS400 Enhanced Strobe - best performance */
+        target_mode = EMMC_MODE_HS400_ES;
+    } else if (ext_csd->card_type & 0x04) {
+        /* Supports HS200/HS400 */
+        target_mode = EMMC_MODE_HS400;
     } else if (ext_csd->card_type & 0x02) {
         /* Supports 52MHz */
         target_mode = EMMC_MODE_SDR;
@@ -370,8 +374,14 @@ emmc_result_t emmc_optimize_performance(void)
     /* Set bus configuration */
     result = emmc_set_bus_config(target_width, target_mode);
     if (result != EMMC_OK) {
-        /* Try fallback configurations */
-        if (target_mode == EMMC_MODE_HS200) {
+        /* Try fallback configurations in order of preference */
+        if (target_mode == EMMC_MODE_HS400_ES) {
+            result = emmc_set_bus_config(target_width, EMMC_MODE_HS400);
+        }
+        if (result != EMMC_OK && (target_mode == EMMC_MODE_HS400 || target_mode == EMMC_MODE_HS400_ES)) {
+            result = emmc_set_bus_config(target_width, EMMC_MODE_HS200);
+        }
+        if (result != EMMC_OK && target_mode == EMMC_MODE_HS200) {
             result = emmc_set_bus_config(target_width, EMMC_MODE_SDR);
         }
         
@@ -446,6 +456,11 @@ emmc_result_t emmc_set_bus_config(emmc_bus_width_t width, emmc_bus_mode_t mode)
             target_freq = HAL_EMMC_HS400_CLOCK_FREQ;
             bus_width_value = EXT_CSD_DDR_BUS_WIDTH_8; /* HS400 requires 8-bit DDR */
             break;
+        case EMMC_MODE_HS400_ES:
+            timing_value = EXT_CSD_TIMING_HS400;
+            target_freq = HAL_EMMC_HS400_CLOCK_FREQ;
+            bus_width_value = EXT_CSD_DDR_BUS_WIDTH_8; /* HS400ES requires 8-bit DDR */
+            break;
         default:
             return EMMC_INVALID_PARAM;
     }
@@ -481,6 +496,24 @@ emmc_result_t emmc_set_bus_config(emmc_bus_width_t width, emmc_bus_mode_t mode)
     
     /* Set new clock frequency */
     hal_emmc_set_clock(target_freq);
+    
+    /* Enable Enhanced Strobe if HS400ES mode */
+    if (mode == EMMC_MODE_HS400_ES) {
+        /* Enable Enhanced Strobe in EXT_CSD */
+        result = emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE,
+                                 EXT_CSD_STROBE_SUPPORT,
+                                 EXT_CSD_ENHANCED_STROBE,
+                                 EMMC_SWITCH_TIMEOUT_MS);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        /* Configure HAL for Enhanced Strobe */
+        result = hal_emmc_set_timing(mode);
+        if (result != EMMC_OK) {
+            return result;
+        }
+    }
     
     return EMMC_OK;
 }

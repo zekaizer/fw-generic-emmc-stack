@@ -201,6 +201,7 @@
 #define EMMC_CTRL2_UHS_SDR104           (3 << 0)
 #define EMMC_CTRL2_UHS_DDR50            (4 << 0)
 #define EMMC_CTRL2_HS400_MODE           (5 << 0)
+#define EMMC_CTRL2_HS400_ES_MODE        (7 << 0)    /* HS400 Enhanced Strobe */
 #define EMMC_CTRL2_18V_ENABLE           (1 << 3)
 #define EMMC_CTRL2_DRV_STRENGTH_MASK    (3 << 4)
 #define EMMC_CTRL2_DRV_STRENGTH_B       (0 << 4)
@@ -216,6 +217,9 @@
 #define EMMC_CTRL2_ADDR64_EN            (1 << 13)
 #define EMMC_CTRL2_ASYNC_INT_EN         (1 << 14)
 #define EMMC_CTRL2_PRESET_VAL_EN        (1 << 15)
+
+/* Enhanced Strobe Control */
+#define EMMC_CTRL2_ENHANCED_STROBE_EN   (1 << 16)   /* Enhanced strobe enable */
 
 /* Common register masks */
 #define EMMC_ERROR_INT_MASK             (EMMC_INT_TIMEOUT | EMMC_INT_CRC_ERROR | \

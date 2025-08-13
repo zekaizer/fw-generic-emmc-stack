@@ -56,7 +56,7 @@ typedef enum {
     EMMC_MODE_DDR       = 1,
     EMMC_MODE_HS200     = 2,
     EMMC_MODE_HS400     = 3,
-    EMMC_MODE_HS400_ES  = 4
+    EMMC_MODE_HS400_ES  = 4     /* Enhanced Strobe - highest performance mode */
 } emmc_bus_mode_t;
 
 /* eMMC bus widths */
@@ -199,6 +199,7 @@ typedef struct {
     emmc_bus_mode_t  bus_mode;
     emmc_bus_width_t bus_width;
     u32             clock_freq;
+    bool            enhanced_strobe;    /* Enhanced strobe enabled */
     bool            initialized;
 } emmc_card_info_t;
 

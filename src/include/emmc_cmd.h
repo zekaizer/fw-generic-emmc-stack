@@ -121,6 +121,9 @@
 #define EXT_CSD_TIMING_HS200            0x02
 #define EXT_CSD_TIMING_HS400            0x03
 
+/* Enhanced Strobe timing (used with HS400) */
+#define EXT_CSD_ENHANCED_STROBE         0x01    /* Enhanced strobe enable bit */
+
 /* BUS_WIDTH values */
 #define EXT_CSD_BUS_WIDTH_1             0x00
 #define EXT_CSD_BUS_WIDTH_4             0x01

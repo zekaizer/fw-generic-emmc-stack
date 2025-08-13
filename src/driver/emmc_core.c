@@ -316,6 +316,7 @@ emmc_result_t emmc_card_initialize(void)
     g_emmc_ctx.card_info.bus_mode = EMMC_MODE_SDR;
     g_emmc_ctx.card_info.bus_width = EMMC_BUS_WIDTH_1;
     g_emmc_ctx.card_info.clock_freq = g_emmc_ctx.current_clock;
+    g_emmc_ctx.card_info.enhanced_strobe = false;
     g_emmc_ctx.card_info.initialized = true;
     
     return EMMC_OK;
