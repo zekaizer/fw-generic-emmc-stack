@@ -44,8 +44,11 @@ typedef struct {
 
 /* RPMB external crypto interface */
 typedef struct {
-    /* External key injection function */
-    emmc_result_t (*inject_key)(const u8 *key, u32 key_len);
+    /* External key retrieval function - gets currently active RPMB key */
+    emmc_result_t (*get_key)(u8 *key, u32 key_len);
+    
+    /* External nonce generation function - generates cryptographically secure random nonce */
+    emmc_result_t (*generate_nonce)(u8 *nonce, u32 nonce_len);
     
     /* External HMAC-SHA256 computation function */
     emmc_result_t (*compute_hmac)(const u8 *key, u32 key_len,
@@ -199,8 +202,8 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter);
  * @brief Write data to RPMB partition
  * @param address Block address (0-based)
  * @param data Data to write (256 bytes per block)
- * @param block_count Number of blocks to write
- * @param key Authentication key (32 bytes)
+ * @param block_count Number of blocks to write (max: EMMC_RPMB_MAX_BLOCKS)
+ * @param key Authentication key (32 bytes, NULL to use stored key)
  * @return EMMC_OK on success, error code otherwise
  */
 emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count, const u8 *key);
@@ -209,11 +212,35 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count,
  * @brief Read data from RPMB partition
  * @param address Block address (0-based)
  * @param data Buffer to store read data (256 bytes per block)
- * @param block_count Number of blocks to read
- * @param key Authentication key (32 bytes)
+ * @param block_count Number of blocks to read (max: EMMC_RPMB_MAX_BLOCKS)
+ * @param key Authentication key (32 bytes, NULL to use stored key)
  * @return EMMC_OK on success, error code otherwise
  */
 emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count, const u8 *key);
+
+/**
+ * @brief Write multiple data blocks to RPMB partition (optimized)
+ * @param address Starting block address (0-based)
+ * @param data Data to write (256 bytes per block)
+ * @param block_count Number of blocks to write (max: EMMC_RPMB_MAX_BLOCKS)
+ * @return EMMC_OK on success, error code otherwise
+ * 
+ * Note: Uses stored key from crypto interface. More efficient than write_data
+ * for multiple blocks as it batches operations where possible.
+ */
+emmc_result_t emmc_rpmb_write_multi(u16 address, const u8 *data, u16 block_count);
+
+/**
+ * @brief Read multiple data blocks from RPMB partition (optimized)
+ * @param address Starting block address (0-based)
+ * @param data Buffer to store read data (256 bytes per block)
+ * @param block_count Number of blocks to read (max: EMMC_RPMB_MAX_BLOCKS)
+ * @return EMMC_OK on success, error code otherwise
+ * 
+ * Note: Uses stored key from crypto interface. Reads all blocks in single
+ * transaction for better performance.
+ */
+emmc_result_t emmc_rpmb_read_multi(u16 address, u8 *data, u16 block_count);
 
 /* Boot Functions */
 
@@ -273,6 +300,7 @@ u32 emmc_get_optimal_transfer_size(void);
 #define EMMC_RPMB_KEY_SIZE          32
 #define EMMC_RPMB_MAC_SIZE          32
 #define EMMC_RPMB_NONCE_SIZE        16
+#define EMMC_RPMB_MAX_BLOCKS        32     /* Maximum blocks per RPMB transaction */
 
 /* Maximum transfer sizes */
 #define EMMC_MAX_SINGLE_TRANSFER    65536   /* sectors */

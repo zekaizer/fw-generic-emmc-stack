@@ -82,24 +82,6 @@ emmc_result_t hal_emmc_set_timing(emmc_bus_mode_t mode);
  * @param cmd Command structure
  * @param data Data structure (NULL if no data transfer)
  * @return EMMC_OK on success, error code otherwise
- * 
- * HAL Implementation Guide:
- * When data is provided, this function should handle all data transfer
- * internally, choosing between DMA and PIO based on data->use_dma flag:
- * 
- * Example implementation:
- *   if (data) {
- *     if (data->use_dma) {
- *       setup_dma_transfer(data->buffer, data->block_size * data->block_count);
- *       start_dma_and_wait_complete();
- *     } else {
- *       if (data->read_operation) {
- *         pio_read_blocks(data->buffer, data->block_size, data->block_count);
- *       } else {
- *         pio_write_blocks(data->buffer, data->block_size, data->block_count);
- *       }
- *     }
- *   }
  */
 emmc_result_t hal_emmc_send_command(const hal_emmc_cmd_t *cmd, 
                                    const hal_emmc_data_t *data);

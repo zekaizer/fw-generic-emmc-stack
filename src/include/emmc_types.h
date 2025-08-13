@@ -203,4 +203,22 @@ typedef struct {
     bool            initialized;
 } emmc_card_info_t;
 
+/* RPMB multi-frame support structures */
+typedef struct {
+    u16 frame_count;                    /* Number of frames in buffer */
+    u16 current_index;                  /* Current processing index */
+    u8  *frame_buffer;                  /* Pointer to frame buffer */
+    u32 buffer_size;                    /* Size of allocated buffer */
+} emmc_rpmb_multi_frame_t;
+
+/* RPMB batch operation context */
+typedef struct {
+    u16 start_address;                  /* Starting block address */
+    u16 total_blocks;                   /* Total blocks to process */
+    u16 completed_blocks;               /* Blocks already processed */
+    bool is_read_operation;             /* true for read, false for write */
+    u8 *data_buffer;                    /* User data buffer */
+    u32 data_size;                      /* Size of user data buffer */
+} emmc_rpmb_batch_context_t;
+
 #endif /* EMMC_TYPES_H */
