@@ -91,6 +91,8 @@ MINIMAL_LIB = $(BUILD_DIR)/lib$(PROJECT_NAME)_minimal$(BUILD_SUFFIX).a
 
 # Phony targets
 .PHONY: all clean distclean full minimal examples tests help size info
+.PHONY: tiny embedded secure performance bootloader recovery
+.PHONY: debug release minimal_optimized baremetal
 
 # Default target
 all: full
@@ -189,6 +191,14 @@ info:
 	@echo "size            - Show size comparison"
 	@echo "clean           - Remove build files"
 	@echo "help            - Show usage examples"
+	@echo ""
+	@echo "=== Preset Targets ==="
+	@echo "tiny            - Absolute minimum (~6-8KB)"
+	@echo "embedded        - Balanced embedded (~12-14KB)"  
+	@echo "secure          - Security focused (~16-18KB)"
+	@echo "performance     - Maximum performance (~20-22KB)"
+	@echo "bootloader      - Bootloader optimized (~10-12KB)"
+	@echo "recovery        - Recovery/update (~16-18KB)"
 
 # Usage help
 help:
@@ -214,6 +224,12 @@ help:
 	@echo "  make BUILD_TYPE=minimal LTO=1 BARE_METAL=1 ARM_TARGET=1"
 	@echo "  make examples"
 	@echo "  make tests"
+	@echo ""
+	@echo "Presets:"
+	@echo "  make tiny               # Minimal size build"
+	@echo "  make embedded           # Balanced embedded build"
+	@echo "  make secure             # Security-focused build"
+	@echo "  make bootloader         # Bootloader-optimized build"
 
 # Clean targets
 clean:
@@ -238,6 +254,25 @@ minimal_optimized:
 
 baremetal:
 	$(MAKE) BARE_METAL=1 ARM_TARGET=1
+
+# Preset targets for different use cases
+tiny:
+	$(MAKE) BUILD_TYPE=minimal LTO=1 BARE_METAL=1 EMMC_PRESET=tiny CFLAGS="$(CFLAGS) -DEMMC_PRESET_TINY"
+
+embedded:
+	$(MAKE) BUILD_TYPE=release LTO=1 BARE_METAL=1 ARM_TARGET=1 EMMC_PRESET=embedded CFLAGS="$(CFLAGS) -DEMMC_PRESET_EMBEDDED"
+
+secure:
+	$(MAKE) BUILD_TYPE=release EMMC_PRESET=secure CFLAGS="$(CFLAGS) -DEMMC_PRESET_SECURE"
+
+performance:
+	$(MAKE) BUILD_TYPE=release LTO=1 EMMC_PRESET=performance CFLAGS="$(CFLAGS) -DEMMC_PRESET_PERFORMANCE"
+
+bootloader:
+	$(MAKE) BUILD_TYPE=minimal LTO=1 BARE_METAL=1 ARM_TARGET=1 EMMC_PRESET=bootloader CFLAGS="$(CFLAGS) -DEMMC_PRESET_BOOTLOADER"
+
+recovery:
+	$(MAKE) BUILD_TYPE=release EMMC_PRESET=recovery CFLAGS="$(CFLAGS) -DEMMC_PRESET_RECOVERY"
 
 # Installation (optional)
 install: full

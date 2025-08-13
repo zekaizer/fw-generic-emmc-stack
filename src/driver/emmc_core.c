@@ -1,3 +1,4 @@
+#include "../include/emmc_config_presets.h"  /* Include static configuration first */
 #include "emmc_core.h"
 
 /* Driver context (global state) */
@@ -252,6 +253,7 @@ emmc_result_t emmc_card_initialize(void)
     g_emmc_ctx.card_info.ocr = ocr;
     
     /* Get CID */
+#if EMMC_COMPILE_CID_PARSING
     result = emmc_send_command(EMMC_CMD2, 0, EMMC_RESP_R2, response);
     if (result != EMMC_OK) {
         return result;
@@ -261,6 +263,16 @@ emmc_result_t emmc_card_initialize(void)
     if (result != EMMC_OK) {
         return result;
     }
+#else
+    /* Skip CID parsing in minimal configuration */
+    result = emmc_send_command(EMMC_CMD2, 0, EMMC_RESP_R2, response);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    /* Set minimal CID information */
+    g_emmc_ctx.card_info.cid.manufacturer_id = 0x00;
+    g_emmc_ctx.card_info.cid.product_serial = 0x00000000;
+#endif
     
     /* Set RCA */
     result = emmc_send_command(EMMC_CMD3, (u32)rca << 16, EMMC_RESP_R1, response);
@@ -271,6 +283,7 @@ emmc_result_t emmc_card_initialize(void)
     g_emmc_ctx.card_info.rca = rca;
     
     /* Get CSD */
+#if EMMC_COMPILE_CSD_PARSING
     result = emmc_send_command(EMMC_CMD9, (u32)rca << 16, EMMC_RESP_R2, response);
     if (result != EMMC_OK) {
         return result;
@@ -280,6 +293,16 @@ emmc_result_t emmc_card_initialize(void)
     if (result != EMMC_OK) {
         return result;
     }
+#else
+    /* Skip CSD parsing in minimal configuration */
+    result = emmc_send_command(EMMC_CMD9, (u32)rca << 16, EMMC_RESP_R2, response);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    /* Set minimal CSD information */
+    g_emmc_ctx.card_info.csd.sector_size = EMMC_STATIC_SECTOR_SIZE;
+    g_emmc_ctx.card_info.csd.capacity_sectors = 0; /* Will be set from EXT_CSD or defaults */
+#endif
     
     /* Select card */
     result = emmc_send_command(EMMC_CMD7, (u32)rca << 16, EMMC_RESP_R1B, response);
@@ -294,6 +317,7 @@ emmc_result_t emmc_card_initialize(void)
     }
     
     /* Read EXT_CSD */
+#if EMMC_COMPILE_EXT_CSD_PARSING
     u8 ext_csd_buffer[512];
     result = emmc_send_command_with_data(EMMC_CMD8, 0, EMMC_RESP_R1,
                                         ext_csd_buffer, 512, 1, true, response);
@@ -309,6 +333,54 @@ emmc_result_t emmc_card_initialize(void)
     /* Calculate capacity */
     g_emmc_ctx.card_info.capacity = emmc_calculate_capacity(&g_emmc_ctx.card_info.csd,
                                                            &g_emmc_ctx.card_info.ext_csd);
+#else
+    /* Skip EXT_CSD parsing - use static defaults */
+    /* Initialize EXT_CSD with default values */
+    memset(&g_emmc_ctx.card_info.ext_csd, 0, sizeof(emmc_ext_csd_t));
+    
+    /* Set static configuration values */
+    #ifdef EMMC_STATIC_SECTOR_COUNT
+        g_emmc_ctx.card_info.capacity = EMMC_STATIC_SECTOR_COUNT * EMMC_STATIC_SECTOR_SIZE;
+    #else
+        g_emmc_ctx.card_info.capacity = 8ULL * 1024 * 1024 * 1024; /* Default: 8GB */
+    #endif
+    
+    #ifdef EMMC_STATIC_BUS_MODE
+        /* Set static bus mode support */
+        #if (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400_ES)
+            g_emmc_ctx.card_info.ext_csd.card_type = 0x07; /* HS200 + HS400 + Enhanced Strobe */
+            g_emmc_ctx.card_info.ext_csd.strobe_support = 0x01;
+        #elif (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400)
+            g_emmc_ctx.card_info.ext_csd.card_type = 0x03; /* HS200 + HS400 */
+        #elif (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS200)
+            g_emmc_ctx.card_info.ext_csd.card_type = 0x02; /* HS200 */
+        #else
+            g_emmc_ctx.card_info.ext_csd.card_type = 0x01; /* SDR/HS */
+        #endif
+    #else
+        g_emmc_ctx.card_info.ext_csd.card_type = 0x07; /* Support all modes */
+        g_emmc_ctx.card_info.ext_csd.strobe_support = 0x01;
+    #endif
+    
+    /* Set partition configuration */
+    g_emmc_ctx.card_info.ext_csd.partition_config = 0x00; /* User partition active */
+    
+    #if EMMC_COMPILE_BOOT_PARTITION
+        #ifdef EMMC_STATIC_BOOT_SIZE
+            g_emmc_ctx.card_info.ext_csd.boot_size_mult = EMMC_STATIC_BOOT_SIZE / (128 * 1024);
+        #else
+            g_emmc_ctx.card_info.ext_csd.boot_size_mult = 32; /* Default: 4MB */
+        #endif
+    #endif
+    
+    #if EMMC_COMPILE_RPMB
+        #ifdef EMMC_STATIC_RPMB_SIZE
+            g_emmc_ctx.card_info.ext_csd.rpmb_size_mult = EMMC_STATIC_RPMB_SIZE / (128 * 1024);
+        #else
+            g_emmc_ctx.card_info.ext_csd.rpmb_size_mult = 32; /* Default: 4MB */
+        #endif
+    #endif
+#endif
     
     /* Set initial state */
     g_emmc_ctx.card_info.state = EMMC_STATE_TRAN;

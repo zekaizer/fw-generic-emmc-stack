@@ -72,6 +72,33 @@ target_compile_definitions(emmc_stack PRIVATE
 option(EMMC_BARE_METAL "Build for bare-metal (no OS)" ON)
 option(EMMC_ARM_TARGET "Target ARM architecture" ON)
 
+# Preset selection
+set(EMMC_PRESET "dynamic" CACHE STRING "Choose eMMC preset: tiny, embedded, secure, performance, bootloader, recovery, or dynamic")
+set_property(CACHE EMMC_PRESET PROPERTY STRINGS "tiny" "embedded" "secure" "performance" "bootloader" "recovery" "dynamic")
+
+# Apply preset-specific compiler definitions
+if(EMMC_PRESET STREQUAL "tiny")
+    target_compile_definitions(emmc_stack PRIVATE EMMC_PRESET_TINY=1)
+    message(STATUS "Using TINY preset - Estimated size: 6-8KB")
+elseif(EMMC_PRESET STREQUAL "embedded")
+    target_compile_definitions(emmc_stack PRIVATE EMMC_PRESET_EMBEDDED=1)
+    message(STATUS "Using EMBEDDED preset - Estimated size: 12-14KB")
+elseif(EMMC_PRESET STREQUAL "secure")
+    target_compile_definitions(emmc_stack PRIVATE EMMC_PRESET_SECURE=1)
+    message(STATUS "Using SECURE preset - Estimated size: 16-18KB")
+elseif(EMMC_PRESET STREQUAL "performance")
+    target_compile_definitions(emmc_stack PRIVATE EMMC_PRESET_PERFORMANCE=1)
+    message(STATUS "Using PERFORMANCE preset - Estimated size: 20-22KB")
+elseif(EMMC_PRESET STREQUAL "bootloader")
+    target_compile_definitions(emmc_stack PRIVATE EMMC_PRESET_BOOTLOADER=1)
+    message(STATUS "Using BOOTLOADER preset - Estimated size: 10-12KB")
+elseif(EMMC_PRESET STREQUAL "recovery")
+    target_compile_definitions(emmc_stack PRIVATE EMMC_PRESET_RECOVERY=1)
+    message(STATUS "Using RECOVERY preset - Estimated size: 16-18KB")
+else()
+    message(STATUS "Using DYNAMIC preset - Estimated size: 20-25KB")
+endif()
+
 if(EMMC_BARE_METAL)
     target_compile_definitions(emmc_stack PRIVATE EMMC_BARE_METAL=1)
     # Remove standard library dependencies
@@ -131,6 +158,7 @@ install(FILES src/protocol/emmc_features.h DESTINATION include/emmc)
 message(STATUS "eMMC Stack Build Configuration:")
 message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C Standard: C${CMAKE_C_STANDARD}")
+message(STATUS "  Preset: ${EMMC_PRESET}")
 message(STATUS "  LTO: ${EMMC_ENABLE_LTO}")
 message(STATUS "  Bare Metal: ${EMMC_BARE_METAL}")
 message(STATUS "  ARM Target: ${EMMC_ARM_TARGET}")
@@ -146,7 +174,26 @@ if(CMAKE_SIZE)
     )
 endif()
 
-# Create a minimal build variant
+# Create preset-specific build variants  
+add_library(emmc_stack_tiny STATIC
+    src/driver/emmc_core.c
+    src/protocol/emmc_protocol.c
+    # Note: emmc_advanced.c is NOT included
+)
+
+target_include_directories(emmc_stack_tiny PUBLIC 
+    src/include
+    src/hal  
+    src/driver
+    src/protocol
+)
+
+target_compile_definitions(emmc_stack_tiny PRIVATE
+    EMMC_PRESET_TINY=1
+    EMMC_MINIMAL_BUILD=1
+)
+
+# Also create a minimal build variant for backward compatibility
 add_library(emmc_stack_minimal STATIC
     src/driver/emmc_core.c
     src/protocol/emmc_protocol.c
@@ -180,7 +227,8 @@ endif()
 message(STATUS "")
 message(STATUS "Build Targets:")
 message(STATUS "  emmc_stack         - Full featured library")
-message(STATUS "  emmc_stack_minimal - Core functions only") 
+message(STATUS "  emmc_stack_minimal - Core functions only")
+message(STATUS "  emmc_stack_tiny    - Tiny preset library") 
 if(EMMC_BUILD_EXAMPLES)
     message(STATUS "  emmc_example       - Full featured example")
     message(STATUS "  emmc_minimal_example - Minimal example")
@@ -189,3 +237,10 @@ if(EMMC_BUILD_TESTS)
     message(STATUS "  emmc_test_basic    - Basic functionality test")
     message(STATUS "  emmc_test_rpmb     - RPMB functionality test")
 endif()
+
+message(STATUS "")
+message(STATUS "Usage Examples:")
+message(STATUS "  cmake .. -DEMMC_PRESET=tiny")
+message(STATUS "  cmake .. -DEMMC_PRESET=embedded -DEMMC_ARM_TARGET=ON") 
+message(STATUS "  cmake .. -DEMMC_PRESET=secure -DEMMC_BUILD_EXAMPLES=ON")
+message(STATUS "  cmake .. -DEMMC_PRESET=performance -DEMMC_ENABLE_LTO=ON")

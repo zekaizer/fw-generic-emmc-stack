@@ -1,3 +1,4 @@
+#include "../include/emmc_config_presets.h"  /* Include static configuration first */
 #include "emmc_protocol.h"
 #include <string.h>
 
@@ -28,7 +29,11 @@ emmc_result_t emmc_protocol_init(const emmc_protocol_config_t *config)
     g_protocol_ctx.config = *config;
     g_protocol_ctx.initialized = true;
     g_protocol_ctx.rpmb_initialized = false;
+#ifdef EMMC_STATIC_TRANSFER_SIZE
+    g_protocol_ctx.optimal_transfer_size = EMMC_STATIC_TRANSFER_SIZE;
+#else
     g_protocol_ctx.optimal_transfer_size = 256; /* Default: 128KB */
+#endif
     
     return EMMC_OK;
 }
@@ -127,16 +132,23 @@ emmc_result_t emmc_block_io(const emmc_block_request_t *request)
         return EMMC_BUSY;
     }
     
+#if EMMC_COMPILE_SINGLE_BLOCK_ONLY
+    max_transfer = 1; /* Force single block transfers */
+    use_predefined_count = false;
+#else
     max_transfer = (request->sector_count > 1) ? EMMC_MAX_MULTI_TRANSFER : EMMC_MAX_SINGLE_TRANSFER;
     
-    remaining_sectors = request->sector_count;
-    current_sector = request->start_sector;
-    current_buffer = request->buffer;
-    
+    #if EMMC_COMPILE_CMD23_SUPPORT
     /* For large transfers, use predefined block count (CMD23) for better performance */
     if (remaining_sectors > g_protocol_ctx.optimal_transfer_size / 4) {
         use_predefined_count = true;
     }
+    #endif
+#endif
+    
+    remaining_sectors = request->sector_count;
+    current_sector = request->start_sector;
+    current_buffer = request->buffer;
     
     while (remaining_sectors > 0) {
         /* Determine transfer size */
@@ -147,6 +159,17 @@ emmc_result_t emmc_block_io(const emmc_block_request_t *request)
         }
         
         /* Perform transfer */
+#if EMMC_COMPILE_SINGLE_BLOCK_ONLY
+        /* Force single block transfer only */
+        {
+            u8 cmd_index = request->read_operation ? EMMC_CMD17 : EMMC_CMD24;
+            u32 lba = emmc_sector_to_lba(current_sector);
+            
+            result = emmc_send_command_with_data(cmd_index, lba, EMMC_RESP_R1,
+                                               current_buffer, EMMC_SECTOR_SIZE, 
+                                               1, request->read_operation, NULL);
+        }
+#else
         if (transfer_sectors == 1) {
             /* Single block transfer */
             u8 cmd_index = request->read_operation ? EMMC_CMD17 : EMMC_CMD24;
@@ -159,6 +182,8 @@ emmc_result_t emmc_block_io(const emmc_block_request_t *request)
             /* Multi-block transfer */
             u8 cmd_index = request->read_operation ? EMMC_CMD18 : EMMC_CMD25;
             u32 lba = emmc_sector_to_lba(current_sector);
+            
+#if EMMC_COMPILE_CMD23_SUPPORT
             u32 cmd23_arg = transfer_sectors;
             
             /* Set predefined block count (CMD23) for better performance and reliability */
@@ -173,26 +198,42 @@ emmc_result_t emmc_block_io(const emmc_block_request_t *request)
                     return result;
                 }
             }
+#endif
             
             result = emmc_send_command_with_data(cmd_index, lba, EMMC_RESP_R1,
                                                current_buffer, EMMC_SECTOR_SIZE,
                                                transfer_sectors, request->read_operation, NULL);
             
+#if EMMC_COMPILE_CMD23_SUPPORT
             /* Send stop command only if CMD23 was not used (no predefined count) */
             if (result == EMMC_OK && !use_predefined_count && !request->reliable_write) {
                 u32 stop_response;
                 emmc_send_command(EMMC_CMD12, 0, EMMC_RESP_R1B, &stop_response);
             }
+#else
+            /* Always send stop command if CMD23 is not supported */
+            if (result == EMMC_OK) {
+                u32 stop_response;
+                emmc_send_command(EMMC_CMD12, 0, EMMC_RESP_R1B, &stop_response);
+            }
+#endif
         }
+#endif
         
         if (result != EMMC_OK) {
             return result;
         }
         
         /* Update counters */
+#if EMMC_COMPILE_SINGLE_BLOCK_ONLY
+        remaining_sectors -= 1;
+        current_sector += 1;
+        current_buffer += EMMC_SECTOR_SIZE;
+#else
         remaining_sectors -= transfer_sectors;
         current_sector += transfer_sectors;
         current_buffer += transfer_sectors * EMMC_SECTOR_SIZE;
+#endif
     }
     
     return EMMC_OK;
@@ -200,6 +241,7 @@ emmc_result_t emmc_block_io(const emmc_block_request_t *request)
 
 emmc_result_t emmc_erase_sectors(u64 start_sector, u32 sector_count)
 {
+#if EMMC_COMPILE_ERASE_CMD
     emmc_result_t result;
     u32 start_lba, end_lba;
     
@@ -234,10 +276,37 @@ emmc_result_t emmc_erase_sectors(u64 start_sector, u32 sector_count)
     
     /* Wait for erase completion */
     return emmc_wait_for_state(EMMC_STATE_TRAN, 30000); /* 30 second timeout */
+#else
+    /* Erase command disabled in static configuration */
+    (void)start_sector;
+    (void)sector_count;
+    return EMMC_NOT_SUPPORTED;
+#endif
 }
 
 emmc_result_t emmc_select_partition(emmc_partition_t partition)
 {
+    /* Check if partition switching is enabled */
+    if (partition == EMMC_PART_BOOT1 && !EMMC_COMPILE_BOOT_PARTITION) {
+        return EMMC_NOT_SUPPORTED;
+    }
+    if (partition == EMMC_PART_BOOT2 && !EMMC_COMPILE_BOOT_PARTITION) {
+        return EMMC_NOT_SUPPORTED;
+    }
+    if (partition == EMMC_PART_RPMB && !EMMC_COMPILE_RPMB) {
+        return EMMC_NOT_SUPPORTED;
+    }
+    if ((partition >= EMMC_PART_GP1 && partition <= EMMC_PART_GP4) && !EMMC_COMPILE_GP_PARTITION) {
+        return EMMC_NOT_SUPPORTED;
+    }
+
+#ifdef EMMC_USER_PARTITION_ONLY
+    /* User partition only mode - reject all other partitions */
+    if (partition != EMMC_PART_USER) {
+        return EMMC_NOT_SUPPORTED;
+    }
+    return EMMC_OK;  /* No actual switching needed */
+#else
     emmc_result_t result;
     const emmc_driver_context_t *ctx;
     u8 partition_config;
@@ -265,6 +334,7 @@ emmc_result_t emmc_select_partition(emmc_partition_t partition)
                              EMMC_SWITCH_TIMEOUT_MS);
     
     return result;
+#endif
 }
 
 emmc_partition_t emmc_get_active_partition(void)
