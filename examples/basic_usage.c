@@ -216,10 +216,21 @@ static void generate_device_unique_key(u8 *key)
 /*
  * Example RPMB initialization (requires external crypto implementation)
  */
-static emmc_result_t example_crypto_inject_key(const u8 *key, u32 key_len)
+static emmc_result_t example_crypto_get_key(u8 *key, u32 key_len)
 {
-    /* Platform-specific key injection implementation would go here */
+    /* Platform-specific key retrieval implementation would go here */
+    /* This is just a placeholder - return stored RPMB key */
+    memset(key, 0x42, key_len); /* Dummy key for example */
+    return EMMC_OK;
+}
+
+static emmc_result_t example_crypto_generate_nonce(u8 *nonce, u32 nonce_len)
+{
+    /* Platform-specific secure random nonce generation would go here */
     /* This is just a placeholder */
+    for (u32 i = 0; i < nonce_len; i++) {
+        nonce[i] = (u8)(i * 0x5A); /* Dummy nonce for example */
+    }
     return EMMC_OK;
 }
 
@@ -245,7 +256,8 @@ static emmc_result_t example_crypto_verify_hmac(const u8 *key, u32 key_len,
 emmc_result_t example_rpmb_init(void)
 {
     emmc_rpmb_crypto_interface_t crypto_interface = {
-        .inject_key = example_crypto_inject_key,
+        .get_key = example_crypto_get_key,
+        .generate_nonce = example_crypto_generate_nonce,
         .compute_hmac = example_crypto_compute_hmac,
         .verify_hmac = example_crypto_verify_hmac
     };

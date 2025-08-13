@@ -675,11 +675,7 @@ emmc_result_t emmc_rpmb_program_key(const u8 *key)
         frame.key_mac[i] = key[i];
     }
     
-    /* Inject key through external interface */
-    result = g_protocol_ctx.rpmb_crypto.inject_key(key, EMMC_RPMB_KEY_SIZE);
-    if (result != EMMC_OK) {
-        return result;
-    }
+    /* Key will be programmed directly to the eMMC, no injection needed */
     
     /* Send RPMB write key command */
     result = emmc_send_command_with_data(EMMC_CMD25, 0, EMMC_RESP_R1,

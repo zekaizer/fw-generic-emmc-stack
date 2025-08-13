@@ -17,17 +17,36 @@ static bool g_key_injected = false;
 /* Mock write counter */
 static u32 g_mock_write_counter = 0;
 
-/* Mock HMAC implementation */
-static emmc_result_t mock_inject_key(const u8 *key, u32 key_len)
+/* Mock crypto implementation */
+static emmc_result_t mock_get_key(u8 *key, u32 key_len)
 {
     if (!key || key_len != 32) {
         return EMMC_INVALID_PARAM;
     }
     
-    memcpy(g_mock_rpmb_key, key, 32);
-    g_key_injected = true;
-    printf("Mock: Key injected successfully\n");
+    if (!g_key_injected) {
+        printf("Mock: Key not available\n");
+        return EMMC_ERROR;
+    }
     
+    memcpy(key, g_mock_rpmb_key, 32);
+    printf("Mock: Key retrieved successfully\n");
+    
+    return EMMC_OK;
+}
+
+static emmc_result_t mock_generate_nonce(u8 *nonce, u32 nonce_len)
+{
+    if (!nonce || nonce_len != 16) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    /* Generate deterministic nonce for testing */
+    for (u32 i = 0; i < nonce_len; i++) {
+        nonce[i] = (u8)(i * 0x11);
+    }
+    
+    printf("Mock: Nonce generated successfully\n");
     return EMMC_OK;
 }
 
@@ -85,10 +104,25 @@ static emmc_result_t mock_verify_hmac(const u8 *key, u32 key_len,
 
 /* Mock crypto interface */
 static emmc_rpmb_crypto_interface_t mock_crypto_interface = {
-    .inject_key = mock_inject_key,
+    .get_key = mock_get_key,
+    .generate_nonce = mock_generate_nonce,
     .compute_hmac = mock_compute_hmac,
     .verify_hmac = mock_verify_hmac
 };
+
+/* Helper function to inject key for testing */
+static emmc_result_t mock_inject_key_for_test(const u8 *key, u32 key_len)
+{
+    if (!key || key_len != 32) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    memcpy(g_mock_rpmb_key, key, 32);
+    g_key_injected = true;
+    printf("Mock: Key injected for test\n");
+    
+    return EMMC_OK;
+}
 
 /* Test data */
 static u8 test_key[32] = {
@@ -262,7 +296,7 @@ static void test_crypto_interface(void)
     
     /* Reset and inject key */
     g_key_injected = false;
-    result = mock_inject_key(test_key, 32);
+    result = mock_inject_key_for_test(test_key, 32);
     assert(result == EMMC_OK);
     printf("✓ Key injection successful\n");
     
@@ -305,7 +339,7 @@ static void test_error_handling(void)
     u8 short_key[16] = {0};
     u8 mac[32];
     
-    result = mock_inject_key(short_key, 16);
+    result = mock_inject_key_for_test(short_key, 16);
     assert(result == EMMC_INVALID_PARAM);
     printf("✓ Short key rejected\n");
     

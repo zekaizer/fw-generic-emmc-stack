@@ -132,7 +132,8 @@ For RPMB (secure storage), provide external crypto functions:
 
 ```c
 emmc_rpmb_crypto_interface_t crypto = {
-    .inject_key = your_key_injection_func,
+    .get_key = your_key_retrieval_func,
+    .generate_nonce = your_nonce_generation_func,
     .compute_hmac = your_hmac_sha256_func,
     .verify_hmac = your_hmac_verify_func
 };
