@@ -60,8 +60,10 @@ src/
 │   ├── emmc_core.h         # Driver interface
 │   └── emmc_core.c         # Driver implementation  
 ├── protocol/
-│   ├── emmc_protocol.h     # Protocol interface
-│   └── emmc_protocol.c     # Protocol implementation
+│   ├── emmc_protocol.h     # Core protocol interface
+│   ├── emmc_protocol.c     # Core protocol implementation
+│   ├── emmc_features.h     # Advanced features (auto-linked)
+│   └── emmc_advanced.c     # Advanced features implementation
 └── include/
     ├── emmc_types.h        # Common data types
     ├── emmc_cmd.h          # Command definitions
@@ -71,7 +73,12 @@ examples/
 └── basic_usage.c           # Usage examples
 
 tests/
-└── hal_stub.c             # HAL stub for testing
+├── hal_stub.c             # HAL stub for testing
+└── test_rpmb.c            # RPMB functionality tests
+
+# Build system
+CMakeLists.txt             # CMake configuration
+Makefile                   # Make configuration
 ```
 
 ## Quick Start
@@ -166,9 +173,25 @@ All functions return `emmc_result_t` status codes:
 
 ## Memory Requirements
 
-- **Code**: ~20KB (optimized build)
+- **Code (Minimal)**: ~12KB (core functions only)
+- **Code (Full)**: ~22KB (all features included)
 - **RAM**: ~2KB static data + buffers  
 - **Stack**: ~1KB maximum call depth
+
+### Dead Code Elimination
+
+The stack uses function-level linking to automatically remove unused features:
+
+```bash
+# Minimal build (basic read/write only)
+make minimal          # ~12KB code size
+
+# Full build (all features)
+make full            # ~22KB code size
+
+# Automatic optimization - only used functions are linked
+make examples        # Links only the functions actually called
+```
 
 ## Development Guidelines
 
@@ -190,19 +213,49 @@ All functions return `emmc_result_t` status codes:
 
 ## Building
 
-The stack is designed to integrate with your existing build system. Example CMake configuration:
+### Using Make
+```bash
+# Basic builds
+make                    # Full featured build (release)
+make minimal           # Core functions only
+make debug             # Debug build with symbols
 
+# Optimized builds  
+make LTO=1             # Enable Link Time Optimization
+make BARE_METAL=1      # Bare-metal optimized build
+make ARM_TARGET=1      # ARM Cortex-A7 optimized
+
+# Combined optimizations
+make BUILD_TYPE=minimal LTO=1 BARE_METAL=1 ARM_TARGET=1
+
+# Examples and tests
+make examples          # Build example programs
+make tests            # Build test programs
+make size             # Compare build sizes
+```
+
+### Using CMake
+```bash
+mkdir build && cd build
+
+# Basic build
+cmake .. && make
+
+# Minimal build  
+cmake -DCMAKE_BUILD_TYPE=MinSizeRel .. && make emmc_stack_minimal
+
+# With examples and tests
+cmake -DEMMC_BUILD_EXAMPLES=ON -DEMMC_BUILD_TESTS=ON .. && make
+```
+
+### Integration Example
 ```cmake
-# Add eMMC stack sources
-file(GLOB EMMC_SOURCES 
-    src/driver/*.c
-    src/protocol/*.c
-    # Add your HAL implementation
-    platform/hal_emmc_impl.c
-)
+# Add to your project
+add_subdirectory(emmc-stack)
+target_link_libraries(your_target emmc_stack)
 
-add_library(emmc_stack ${EMMC_SOURCES})
-target_include_directories(emmc_stack PUBLIC src/include)
+# Or minimal version
+target_link_libraries(your_target emmc_stack_minimal)
 ```
 
 ## Testing

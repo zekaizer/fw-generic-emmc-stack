@@ -139,27 +139,9 @@ emmc_partition_t emmc_get_active_partition(void);
  */
 emmc_result_t emmc_get_partition_size(emmc_partition_t partition, u64 *size_bytes);
 
-/**
- * @brief Enable or disable write protection
- * @param partition Target partition
- * @param enable true to enable, false to disable
- * @param permanent true for permanent protection, false for temporary
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_set_write_protect(emmc_partition_t partition, bool enable, bool permanent);
+/* Write protection and other advanced functions moved to emmc_features.h */
 
-/**
- * @brief Flush internal cache
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_flush_cache(void);
-
-/**
- * @brief Enable or disable cache
- * @param enable true to enable, false to disable
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_set_cache_enable(bool enable);
+/* Cache functions moved to emmc_features.h */
 
 /**
  * @brief Get card information
@@ -254,42 +236,8 @@ emmc_result_t emmc_configure_boot(emmc_partition_t boot_partition, bool enable_b
  */
 emmc_result_t emmc_write_boot_code(emmc_partition_t boot_partition, const u8 *boot_code, u32 code_size);
 
-/* Advanced Features */
-
-/**
- * @brief Enable or disable background operations
- * @param enable true to enable, false to disable
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_set_bkops_enable(bool enable);
-
-/**
- * @brief Start background operations manually
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_start_bkops(void);
-
-/**
- * @brief Check if background operations are needed
- * @param level Pointer to store BKOPS level
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_check_bkops_status(u8 *level);
-
-/**
- * @brief Sanitize the entire device
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_sanitize(void);
-
-/**
- * @brief Get device health information
- * @param pre_eol_info Pointer to store pre-EOL information
- * @param device_life_time_est_a Pointer to store device lifetime estimate type A
- * @param device_life_time_est_b Pointer to store device lifetime estimate type B
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_get_health_info(u8 *pre_eol_info, u8 *device_life_time_est_a, u8 *device_life_time_est_b);
+/* Advanced Features - Include optional advanced functions */
+#include "emmc_features.h"
 
 /* Utility Functions */
 
