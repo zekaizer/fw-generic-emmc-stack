@@ -151,12 +151,6 @@ emmc_result_t emmc_set_timing_mode(emmc_bus_mode_t mode);
  */
 emmc_result_t emmc_set_block_length(u32 block_len);
 
-/**
- * @brief Perform bus test
- * @param width Bus width to test
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_bus_test(emmc_bus_width_t width);
 
 /**
  * @brief Calculate card capacity from CSD

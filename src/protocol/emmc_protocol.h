@@ -244,26 +244,6 @@ emmc_result_t emmc_rpmb_write_multi(u16 address, const u8 *data, u16 block_count
  */
 emmc_result_t emmc_rpmb_read_multi(u16 address, u8 *data, u16 block_count);
 
-/* Boot Functions */
-
-/**
- * @brief Configure boot partition
- * @param boot_partition Boot partition selection (BOOT1 or BOOT2)
- * @param enable_boot_ack Enable boot acknowledge
- * @param boot_bus_width Boot bus width
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_configure_boot(emmc_partition_t boot_partition, bool enable_boot_ack, 
-                                 emmc_bus_width_t boot_bus_width);
-
-/**
- * @brief Write boot code to boot partition
- * @param boot_partition Target boot partition
- * @param boot_code Boot code data
- * @param code_size Size of boot code in bytes
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_write_boot_code(emmc_partition_t boot_partition, const u8 *boot_code, u32 code_size);
 
 /* Advanced Features - Include optional advanced functions */
 #include "emmc_features.h"

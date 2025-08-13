@@ -606,3 +606,266 @@ emmc_result_t emmc_wait_for_state(emmc_state_t target_state, u32 timeout_ms)
     
     return EMMC_TIMEOUT;
 }
+
+emmc_result_t emmc_read_cid(emmc_cid_t *cid)
+{
+    u32 response[4];
+    emmc_result_t result;
+    
+    if (!cid || !g_emmc_ctx.initialized) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    result = emmc_send_command(EMMC_CMD2, 0, EMMC_RESP_R2, response);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    return emmc_parse_cid(response, cid);
+}
+
+emmc_result_t emmc_read_csd(emmc_csd_t *csd)
+{
+    u32 response[4];
+    emmc_result_t result;
+    
+    if (!csd || !g_emmc_ctx.initialized) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    result = emmc_send_command(EMMC_CMD9, g_emmc_ctx.card_info.rca << 16, EMMC_RESP_R2, response);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    return emmc_parse_csd(response, csd);
+}
+
+emmc_result_t emmc_read_ext_csd(emmc_ext_csd_t *ext_csd)
+{
+    u8 buffer[512];
+    emmc_result_t result;
+    
+    if (!ext_csd || !g_emmc_ctx.initialized) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    result = emmc_send_command_with_data(EMMC_CMD8, 0, EMMC_RESP_R1, 
+                                        buffer, 512, 1, true, NULL);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    return emmc_parse_ext_csd(buffer, ext_csd);
+}
+
+emmc_result_t emmc_switch_partition(emmc_partition_t partition)
+{
+    emmc_result_t result;
+    u8 partition_config;
+    
+    if (!g_emmc_ctx.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    if (partition > EMMC_PART_GP4) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    /* Read current partition configuration */
+    partition_config = (partition & 0x07) << 3;
+    
+    /* Switch partition using SWITCH command */
+    result = emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE, 
+                             EXT_CSD_PARTITION_CONFIG, 
+                             partition_config, 
+                             EMMC_SWITCH_TIMEOUT_MS);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    g_emmc_ctx.active_part = partition;
+    return EMMC_OK;
+}
+
+emmc_result_t emmc_switch_mode(u8 access_mode, u8 index, u8 value, u32 timeout_ms)
+{
+    u32 argument;
+    emmc_result_t result;
+    
+    if (!g_emmc_ctx.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    /* Build SWITCH command argument */
+    argument = (access_mode << 24) | (index << 16) | (value << 8);
+    
+    result = emmc_send_command(EMMC_CMD6, argument, EMMC_RESP_R1B, NULL);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Wait for card to be ready after switch */
+    result = emmc_wait_for_state(EMMC_STATE_TRAN, timeout_ms);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    return EMMC_OK;
+}
+
+emmc_result_t emmc_set_bus_width(emmc_bus_width_t width)
+{
+    emmc_result_t result;
+    u8 bus_width_value;
+    
+    if (!g_emmc_ctx.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    /* Map bus width enum to EXT_CSD value */
+    switch (width) {
+        case EMMC_BUS_WIDTH_1:
+            bus_width_value = 0;
+            break;
+        case EMMC_BUS_WIDTH_4:
+            bus_width_value = 1;
+            break;
+        case EMMC_BUS_WIDTH_8:
+            bus_width_value = 2;
+            break;
+        default:
+            return EMMC_INVALID_PARAM;
+    }
+    
+    /* Set bus width in card */
+    result = emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE, 
+                             EXT_CSD_BUS_WIDTH, 
+                             bus_width_value, 
+                             EMMC_SWITCH_TIMEOUT_MS);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Set bus width in controller */
+    result = hal_emmc_set_bus_width(width);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    g_emmc_ctx.card_info.bus_width = width;
+    return EMMC_OK;
+}
+
+emmc_result_t emmc_set_timing_mode(emmc_bus_mode_t mode)
+{
+    emmc_result_t result;
+    u8 hs_timing_value;
+    
+    if (!g_emmc_ctx.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    /* Map timing mode to EXT_CSD HS_TIMING value */
+    switch (mode) {
+        case EMMC_MODE_SDR:
+            hs_timing_value = 0;
+            break;
+        case EMMC_MODE_HS200:
+            hs_timing_value = 2;
+            break;
+        case EMMC_MODE_HS400:
+        case EMMC_MODE_HS400_ES:
+            hs_timing_value = 3;
+            break;
+        default:
+            hs_timing_value = 1; /* High Speed */
+            break;
+    }
+    
+    /* Set timing mode in card */
+    result = emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE, 
+                             EXT_CSD_HS_TIMING, 
+                             hs_timing_value, 
+                             EMMC_SWITCH_TIMEOUT_MS);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Set timing mode in controller */
+    result = hal_emmc_set_timing(mode);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    g_emmc_ctx.card_info.bus_mode = mode;
+    return EMMC_OK;
+}
+
+emmc_result_t emmc_set_block_length(u32 block_len)
+{
+    emmc_result_t result;
+    
+    if (!g_emmc_ctx.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    if (block_len == 0 || block_len > 512) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    result = emmc_send_command(EMMC_CMD16, block_len, EMMC_RESP_R1, NULL);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    return EMMC_OK;
+}
+
+emmc_result_t emmc_set_cache_enable(bool enable)
+{
+    if (!g_emmc_ctx.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    return emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE, 
+                           EXT_CSD_CACHE_CTRL, 
+                           enable ? 1 : 0, 
+                           EMMC_SWITCH_TIMEOUT_MS);
+}
+
+emmc_result_t emmc_flush_cache(void)
+{
+    if (!g_emmc_ctx.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    return emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE, 
+                           EXT_CSD_FLUSH_CACHE, 
+                           1, 
+                           EMMC_SWITCH_TIMEOUT_MS);
+}
+
+emmc_result_t emmc_set_bkops_enable(bool enable)
+{
+    if (!g_emmc_ctx.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    return emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE, 
+                           EXT_CSD_BKOPS_EN, 
+                           enable ? 1 : 0, 
+                           EMMC_SWITCH_TIMEOUT_MS);
+}
+
+emmc_result_t emmc_get_temperature(s8 *temperature)
+{
+    if (!temperature || !g_emmc_ctx.initialized) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    /* This is a placeholder - actual implementation would read temperature
+     * from device-specific registers or EXT_CSD if supported */
+    *temperature = 25; /* Default room temperature */
+    return EMMC_NOT_SUPPORTED;
+}
