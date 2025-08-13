@@ -165,17 +165,17 @@ emmc_result_t hal_emmc_send_command(const hal_emmc_cmd_t *cmd,
             
         case EMMC_CMD8: /* SEND_EXT_CSD */
             if (data && data->read_operation) {
-                /* Simulate EXT_CSD data */
+                /* Simulate EXT_CSD data - copy directly to user buffer */
                 for (u32 i = 0; i < 512; i++) {
-                    g_hal_state.data_buffer[i] = (u8)(i & 0xFF);
+                    data->buffer[i] = (u8)(i & 0xFF);
                 }
                 /* Set some important EXT_CSD fields */
-                g_hal_state.data_buffer[192] = 8; /* EXT_CSD_REV */
-                g_hal_state.data_buffer[196] = 0x07; /* CARD_TYPE - supports HS200 */
-                g_hal_state.data_buffer[212] = 0x00; /* SEC_COUNT[0] */
-                g_hal_state.data_buffer[213] = 0x00; /* SEC_COUNT[1] */
-                g_hal_state.data_buffer[214] = 0x10; /* SEC_COUNT[2] */
-                g_hal_state.data_buffer[215] = 0x00; /* SEC_COUNT[3] = 1M sectors */
+                data->buffer[192] = 8; /* EXT_CSD_REV */
+                data->buffer[196] = 0x07; /* CARD_TYPE - supports HS200 */
+                data->buffer[212] = 0x00; /* SEC_COUNT[0] */
+                data->buffer[213] = 0x00; /* SEC_COUNT[1] */
+                data->buffer[214] = 0x10; /* SEC_COUNT[2] */
+                data->buffer[215] = 0x00; /* SEC_COUNT[3] = 1M sectors */
             }
             g_hal_state.response[0] = 0x00000900; /* Ready for data */
             break;
@@ -195,9 +195,14 @@ emmc_result_t hal_emmc_send_command(const hal_emmc_cmd_t *cmd,
         case EMMC_CMD17: /* READ_SINGLE_BLOCK */
         case EMMC_CMD18: /* READ_MULTIPLE_BLOCK */
             if (data && data->read_operation) {
-                /* Simulate reading data pattern */
+                /* Simulate reading data pattern - copy directly to user buffer */
                 for (u32 i = 0; i < data->block_size * data->block_count; i++) {
-                    g_hal_state.data_buffer[i] = (u8)((cmd->argument + i) & 0xFF);
+                    data->buffer[i] = (u8)((cmd->argument + i) & 0xFF);
+                }
+            } else if (data && !data->read_operation) {
+                /* Simulate writing data pattern - copy from user buffer */
+                for (u32 i = 0; i < data->block_size * data->block_count; i++) {
+                    g_hal_state.data_buffer[i % sizeof(g_hal_state.data_buffer)] = data->buffer[i];
                 }
             }
             g_hal_state.response[0] = 0x00000900;
@@ -206,8 +211,10 @@ emmc_result_t hal_emmc_send_command(const hal_emmc_cmd_t *cmd,
         case EMMC_CMD24: /* WRITE_BLOCK */
         case EMMC_CMD25: /* WRITE_MULTIPLE_BLOCK */
             if (data && !data->read_operation) {
-                /* Simulate write by copying data */
-                g_hal_state.data_index = 0;
+                /* Simulate writing data pattern - copy from user buffer */
+                for (u32 i = 0; i < data->block_size * data->block_count; i++) {
+                    g_hal_state.data_buffer[i % sizeof(g_hal_state.data_buffer)] = data->buffer[i];
+                }
             }
             g_hal_state.response[0] = 0x00000900;
             break;
@@ -278,38 +285,12 @@ emmc_result_t hal_emmc_wait_data_complete(u32 timeout_ms)
     return EMMC_OK;
 }
 
-u32 hal_emmc_read_data(u8 *buffer, u32 size)
-{
-    if (!g_hal_state.initialized || !buffer) {
-        return 0;
-    }
-    
-    u32 bytes_to_copy = (size > sizeof(g_hal_state.data_buffer)) ? 
-                        sizeof(g_hal_state.data_buffer) : size;
-    
-    for (u32 i = 0; i < bytes_to_copy; i++) {
-        buffer[i] = g_hal_state.data_buffer[i];
-    }
-    
-    return bytes_to_copy;
-}
-
-u32 hal_emmc_write_data(const u8 *buffer, u32 size)
-{
-    if (!g_hal_state.initialized || !buffer) {
-        return 0;
-    }
-    
-    u32 bytes_to_copy = (size > sizeof(g_hal_state.data_buffer)) ? 
-                        sizeof(g_hal_state.data_buffer) : size;
-    
-    for (u32 i = 0; i < bytes_to_copy; i++) {
-        g_hal_state.data_buffer[g_hal_state.data_index + i] = buffer[i];
-    }
-    
-    g_hal_state.data_index += bytes_to_copy;
-    return bytes_to_copy;
-}
+/*
+ * Note: hal_emmc_read_data() and hal_emmc_write_data() functions have been
+ * removed as data transfer is now handled internally by hal_emmc_send_command()
+ * when a data structure is provided. The HAL implementation handles both
+ * DMA and PIO modes automatically based on the use_dma flag.
+ */
 
 bool hal_emmc_is_command_ready(void)
 {

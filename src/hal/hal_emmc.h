@@ -82,6 +82,24 @@ emmc_result_t hal_emmc_set_timing(emmc_bus_mode_t mode);
  * @param cmd Command structure
  * @param data Data structure (NULL if no data transfer)
  * @return EMMC_OK on success, error code otherwise
+ * 
+ * HAL Implementation Guide:
+ * When data is provided, this function should handle all data transfer
+ * internally, choosing between DMA and PIO based on data->use_dma flag:
+ * 
+ * Example implementation:
+ *   if (data) {
+ *     if (data->use_dma) {
+ *       setup_dma_transfer(data->buffer, data->block_size * data->block_count);
+ *       start_dma_and_wait_complete();
+ *     } else {
+ *       if (data->read_operation) {
+ *         pio_read_blocks(data->buffer, data->block_size, data->block_count);
+ *       } else {
+ *         pio_write_blocks(data->buffer, data->block_size, data->block_count);
+ *       }
+ *     }
+ *   }
  */
 emmc_result_t hal_emmc_send_command(const hal_emmc_cmd_t *cmd, 
                                    const hal_emmc_data_t *data);
@@ -101,21 +119,12 @@ emmc_result_t hal_emmc_get_response(u32 *response, emmc_resp_type_t resp_type);
  */
 emmc_result_t hal_emmc_wait_data_complete(u32 timeout_ms);
 
-/**
- * @brief Read data from the controller data port
- * @param buffer Buffer to store data
- * @param size Number of bytes to read
- * @return Number of bytes actually read
+/*
+ * Note: Data transfer is handled internally by hal_emmc_send_command()
+ * when data parameter is provided. The HAL implementation should handle
+ * both DMA and PIO modes based on the use_dma flag in hal_emmc_data_t.
+ * No separate read_data/write_data functions are needed.
  */
-u32 hal_emmc_read_data(u8 *buffer, u32 size);
-
-/**
- * @brief Write data to the controller data port
- * @param buffer Buffer containing data to write
- * @param size Number of bytes to write
- * @return Number of bytes actually written
- */
-u32 hal_emmc_write_data(const u8 *buffer, u32 size);
 
 /**
  * @brief Check if the controller is ready for a new command
