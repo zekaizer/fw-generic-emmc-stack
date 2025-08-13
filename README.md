@@ -139,7 +139,23 @@ emmc_rpmb_crypto_interface_t crypto = {
 };
 
 emmc_rpmb_init(&crypto);
-/* RPMB operations now available */
+
+/* Program authentication key (one-time operation) */
+u8 auth_key[32] = { /* your 256-bit authentication key */ };
+emmc_rpmb_program_key(auth_key);
+
+/* Write secure data (uses key from crypto interface) */
+u8 secure_data[256] = { /* your data */ };
+emmc_rpmb_write_data(0, secure_data, 1);  /* address 0, 1 block */
+
+/* Read secure data (automatically authenticated) */
+u8 read_buffer[256];
+emmc_rpmb_read_data(0, read_buffer, 1);   /* address 0, 1 block */
+
+/* Multi-block operations (up to 32 blocks) */
+u8 large_data[32 * 256];  /* 32 blocks worth of data */
+emmc_rpmb_write_multi(0, large_data, 32);
+emmc_rpmb_read_multi(0, large_data, 32);
 ```
 
 ## Advanced Features

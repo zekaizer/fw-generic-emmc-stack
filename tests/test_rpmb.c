@@ -223,27 +223,26 @@ static void test_rpmb_write_data(void)
     printf("\n=== Test 4: Data Write Operations ===\n");
     
     /* Test with NULL data */
-    result = emmc_rpmb_write_data(0, NULL, 1, test_key);
+    result = emmc_rpmb_write_data(0, NULL, 1);
     assert(result == EMMC_INVALID_PARAM);
     printf("✓ NULL data rejected\n");
     
-    /* Test with NULL key */
-    result = emmc_rpmb_write_data(0, test_data, 1, NULL);
-    assert(result == EMMC_INVALID_PARAM);
-    printf("✓ NULL key rejected\n");
+    /* Test with uninitialized crypto interface (simulate missing key) */
+    /* This test would require modifying the crypto interface which is complex */
+    /* Skipping for now as the key is now retrieved automatically */
     
     /* Test with zero block count */
-    result = emmc_rpmb_write_data(0, test_data, 0, test_key);
+    result = emmc_rpmb_write_data(0, test_data, 0);
     assert(result == EMMC_INVALID_PARAM);
     printf("✓ Zero block count rejected\n");
     
-    /* Test with multiple blocks (not supported) */
-    result = emmc_rpmb_write_data(0, test_data, 2, test_key);
-    assert(result == EMMC_NOT_SUPPORTED);
-    printf("✓ Multiple blocks correctly rejected\n");
+    /* Test with too many blocks */
+    result = emmc_rpmb_write_data(0, test_data, 33);
+    assert(result == EMMC_INVALID_PARAM);
+    printf("✓ Too many blocks rejected\n");
     
     /* Test valid single block write (will fail without hardware) */
-    result = emmc_rpmb_write_data(0, test_data, 1, test_key);
+    result = emmc_rpmb_write_data(0, test_data, 1);
     printf("✓ Single block write attempted (result: %d)\n", result);
     
     printf("Test 4 PASSED\n");
@@ -258,28 +257,27 @@ static void test_rpmb_read_data(void)
     printf("\n=== Test 5: Data Read Operations ===\n");
     
     /* Test with NULL data buffer */
-    result = emmc_rpmb_read_data(0, NULL, 1, test_key);
+    result = emmc_rpmb_read_data(0, NULL, 1);
     assert(result == EMMC_INVALID_PARAM);
     printf("✓ NULL data buffer rejected\n");
     
-    /* Test with NULL key */
-    result = emmc_rpmb_read_data(0, read_buffer, 1, NULL);
-    assert(result == EMMC_INVALID_PARAM);
-    printf("✓ NULL key rejected\n");
+    /* Test with uninitialized crypto interface (simulate missing key) */
+    /* This test would require modifying the crypto interface which is complex */
+    /* Skipping for now as the key is now retrieved automatically */
     
     /* Test with zero block count */
-    result = emmc_rpmb_read_data(0, read_buffer, 0, test_key);
+    result = emmc_rpmb_read_data(0, read_buffer, 0);
     assert(result == EMMC_INVALID_PARAM);
     printf("✓ Zero block count rejected\n");
     
-    /* Test with multiple blocks (not supported) */
-    result = emmc_rpmb_read_data(0, read_buffer, 2, test_key);
-    assert(result == EMMC_NOT_SUPPORTED);
-    printf("✓ Multiple blocks correctly rejected\n");
+    /* Test with too many blocks */
+    result = emmc_rpmb_read_data(0, read_buffer, 33);
+    assert(result == EMMC_INVALID_PARAM);
+    printf("✓ Too many blocks rejected\n");
     
     /* Test valid single block read (will fail without hardware) */
     memset(read_buffer, 0, sizeof(read_buffer));
-    result = emmc_rpmb_read_data(0, read_buffer, 1, test_key);
+    result = emmc_rpmb_read_data(0, read_buffer, 1);
     printf("✓ Single block read attempted (result: %d)\n", result);
     
     printf("Test 5 PASSED\n");
@@ -329,10 +327,10 @@ static void test_error_handling(void)
     
     /* Test operations without RPMB initialization */
     /* Note: This assumes protocol is not initialized */
-    result = emmc_rpmb_write_data(0, test_data, 1, test_key);
+    result = emmc_rpmb_write_data(0, test_data, 1);
     printf("✓ Write without init (result: %d)\n", result);
     
-    result = emmc_rpmb_read_data(0, buffer, 1, test_key);
+    result = emmc_rpmb_read_data(0, buffer, 1);
     printf("✓ Read without init (result: %d)\n", result);
     
     /* Test with invalid key lengths in crypto functions */
@@ -393,14 +391,14 @@ void rpmb_usage_example(void)
     
     /* 3. Write secure data */
     u8 secure_data[256] = "This is confidential data stored in RPMB";
-    emmc_result_t result = emmc_rpmb_write_data(0, secure_data, 1, auth_key);
+    emmc_result_t result = emmc_rpmb_write_data(0, secure_data, 1);
     
     if (result == EMMC_OK) {
         printf("Secure data written successfully\n");
         
         /* 4. Read and verify secure data */
         u8 read_buffer[256];
-        result = emmc_rpmb_read_data(0, read_buffer, 1, auth_key);
+        result = emmc_rpmb_read_data(0, read_buffer, 1);
         
         if (result == EMMC_OK && memcmp(secure_data, read_buffer, 256) == 0) {
             printf("Secure data read and verified successfully\n");

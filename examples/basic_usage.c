@@ -303,14 +303,14 @@ emmc_result_t example_rpmb_secure_storage_test(void)
              "Confidential data - Write Counter: %u", write_counter);
     
     /* Write secure data to RPMB */
-    result = emmc_rpmb_write_data(0, secure_data, 1, authentication_key);
+    result = emmc_rpmb_write_data(0, secure_data, 1);
     if (result != EMMC_OK) {
         return result;
     }
     
     /* Read and verify secure data */
     memset(read_buffer, 0, sizeof(read_buffer));
-    result = emmc_rpmb_read_data(0, read_buffer, 1, authentication_key);
+    result = emmc_rpmb_read_data(0, read_buffer, 1);
     if (result != EMMC_OK) {
         return result;
     }

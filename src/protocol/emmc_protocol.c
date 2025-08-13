@@ -838,11 +838,10 @@ static void emmc_rpmb_generate_nonce(u8 *nonce)
     }
 }
 
-emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count, const u8 *key)
+emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
 {
     emmc_result_t result;
-    u8 current_key[EMMC_RPMB_KEY_SIZE];
-    const u8 *auth_key = key;
+    u8 auth_key[EMMC_RPMB_KEY_SIZE];
     
     if (!g_protocol_ctx.initialized || !g_protocol_ctx.rpmb_initialized || 
         !data || block_count == 0) {
@@ -854,16 +853,13 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count,
         return EMMC_INVALID_PARAM;
     }
     
-    /* Get key from crypto interface if not provided */
-    if (!key) {
-        if (!g_protocol_ctx.rpmb_crypto.get_key) {
-            return EMMC_INVALID_PARAM;
-        }
-        result = g_protocol_ctx.rpmb_crypto.get_key(current_key, EMMC_RPMB_KEY_SIZE);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        auth_key = current_key;
+    /* Get key from crypto interface */
+    if (!g_protocol_ctx.rpmb_crypto.get_key) {
+        return EMMC_INVALID_PARAM;
+    }
+    result = g_protocol_ctx.rpmb_crypto.get_key(auth_key, EMMC_RPMB_KEY_SIZE);
+    if (result != EMMC_OK) {
+        return result;
     }
     
     /* RPMB authenticated writes must be done one block at a time */
@@ -880,14 +876,13 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count,
     return EMMC_OK;
 }
 
-emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count, const u8 *key)
+emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
 {
     emmc_result_t result;
     emmc_rpmb_frame_t read_frame = {0};
     emmc_rpmb_frame_t *response_frames;
     u8 nonce[EMMC_RPMB_NONCE_SIZE];
-    u8 current_key[EMMC_RPMB_KEY_SIZE];
-    const u8 *auth_key = key;
+    u8 auth_key[EMMC_RPMB_KEY_SIZE];
     
     if (!g_protocol_ctx.initialized || !g_protocol_ctx.rpmb_initialized || 
         !data || block_count == 0) {
@@ -899,16 +894,13 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count, const 
         return EMMC_INVALID_PARAM;
     }
     
-    /* Get key from crypto interface if not provided */
-    if (!key) {
-        if (!g_protocol_ctx.rpmb_crypto.get_key) {
-            return EMMC_INVALID_PARAM;
-        }
-        result = g_protocol_ctx.rpmb_crypto.get_key(current_key, EMMC_RPMB_KEY_SIZE);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        auth_key = current_key;
+    /* Get key from crypto interface */
+    if (!g_protocol_ctx.rpmb_crypto.get_key) {
+        return EMMC_INVALID_PARAM;
+    }
+    result = g_protocol_ctx.rpmb_crypto.get_key(auth_key, EMMC_RPMB_KEY_SIZE);
+    if (result != EMMC_OK) {
+        return result;
     }
     
     /* Allocate response frames buffer (static allocation for bare-metal) */
@@ -1070,12 +1062,12 @@ static emmc_result_t emmc_rpmb_write_single_block(u16 address, const u8 *data, c
 
 emmc_result_t emmc_rpmb_read_multi(u16 address, u8 *data, u16 block_count)
 {
-    /* Use read_data with NULL key to use stored key */
-    return emmc_rpmb_read_data(address, data, block_count, NULL);
+    /* Use read_data - key automatically retrieved from crypto interface */
+    return emmc_rpmb_read_data(address, data, block_count);
 }
 
 emmc_result_t emmc_rpmb_write_multi(u16 address, const u8 *data, u16 block_count)
 {
-    /* Use write_data with NULL key to use stored key */
-    return emmc_rpmb_write_data(address, data, block_count, NULL);
+    /* Use write_data - key automatically retrieved from crypto interface */
+    return emmc_rpmb_write_data(address, data, block_count);
 }

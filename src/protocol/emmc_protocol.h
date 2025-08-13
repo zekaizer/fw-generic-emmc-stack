@@ -203,20 +203,22 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter);
  * @param address Block address (0-based)
  * @param data Data to write (256 bytes per block)
  * @param block_count Number of blocks to write (max: EMMC_RPMB_MAX_BLOCKS)
- * @param key Authentication key (32 bytes, NULL to use stored key)
  * @return EMMC_OK on success, error code otherwise
+ * 
+ * Note: Uses key from crypto interface. Key must be available via get_key().
  */
-emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count, const u8 *key);
+emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count);
 
 /**
  * @brief Read data from RPMB partition
  * @param address Block address (0-based)
  * @param data Buffer to store read data (256 bytes per block)
  * @param block_count Number of blocks to read (max: EMMC_RPMB_MAX_BLOCKS)
- * @param key Authentication key (32 bytes, NULL to use stored key)
  * @return EMMC_OK on success, error code otherwise
+ * 
+ * Note: Uses key from crypto interface. Key must be available via get_key().
  */
-emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count, const u8 *key);
+emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count);
 
 /**
  * @brief Write multiple data blocks to RPMB partition (optimized)
