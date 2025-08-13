@@ -1,0 +1,205 @@
+#ifndef EMMC_TYPES_H
+#define EMMC_TYPES_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+/* Basic type definitions */
+typedef uint8_t  u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+
+/* eMMC response types */
+typedef enum {
+    EMMC_RESP_NONE  = 0,
+    EMMC_RESP_R1    = 1,
+    EMMC_RESP_R1B   = 2,
+    EMMC_RESP_R2    = 3,
+    EMMC_RESP_R3    = 4,
+    EMMC_RESP_R4    = 5,
+    EMMC_RESP_R5    = 6,
+    EMMC_RESP_R6    = 7,
+    EMMC_RESP_R7    = 8
+} emmc_resp_type_t;
+
+/* eMMC card states */
+typedef enum {
+    EMMC_STATE_IDLE     = 0,
+    EMMC_STATE_READY    = 1,
+    EMMC_STATE_IDENT    = 2,
+    EMMC_STATE_STBY     = 3,
+    EMMC_STATE_TRAN     = 4,
+    EMMC_STATE_DATA     = 5,
+    EMMC_STATE_RCV      = 6,
+    EMMC_STATE_PRG      = 7,
+    EMMC_STATE_DIS      = 8,
+    EMMC_STATE_BTST     = 9,
+    EMMC_STATE_SLP      = 10
+} emmc_state_t;
+
+/* eMMC partitions */
+typedef enum {
+    EMMC_PART_USER      = 0,
+    EMMC_PART_BOOT1     = 1,
+    EMMC_PART_BOOT2     = 2,
+    EMMC_PART_RPMB      = 3,
+    EMMC_PART_GP1       = 4,
+    EMMC_PART_GP2       = 5,
+    EMMC_PART_GP3       = 6,
+    EMMC_PART_GP4       = 7
+} emmc_partition_t;
+
+/* eMMC bus modes */
+typedef enum {
+    EMMC_MODE_SDR       = 0,
+    EMMC_MODE_DDR       = 1,
+    EMMC_MODE_HS200     = 2,
+    EMMC_MODE_HS400     = 3,
+    EMMC_MODE_HS400_ES  = 4
+} emmc_bus_mode_t;
+
+/* eMMC bus widths */
+typedef enum {
+    EMMC_BUS_WIDTH_1    = 0,
+    EMMC_BUS_WIDTH_4    = 1,
+    EMMC_BUS_WIDTH_8    = 2
+} emmc_bus_width_t;
+
+/* Return codes */
+typedef enum {
+    EMMC_OK             = 0,
+    EMMC_ERROR          = -1,
+    EMMC_TIMEOUT        = -2,
+    EMMC_CRC_ERROR      = -3,
+    EMMC_BUSY           = -4,
+    EMMC_NOT_READY      = -5,
+    EMMC_INVALID_PARAM  = -6,
+    EMMC_NOT_SUPPORTED  = -7
+} emmc_result_t;
+
+/* CID structure */
+typedef struct {
+    u8  mid;        /* Manufacturer ID */
+    u16 oid;        /* OEM/Application ID */
+    u8  pnm[6];     /* Product name */
+    u8  prv;        /* Product revision */
+    u32 psn;        /* Product serial number */
+    u8  mdt;        /* Manufacturing date */
+    u8  crc;        /* CRC7 checksum */
+} emmc_cid_t;
+
+/* CSD structure */
+typedef struct {
+    u8  csd_structure;
+    u8  mmc_prot;
+    u8  taac;
+    u8  nsac;
+    u8  tran_speed;
+    u16 ccc;
+    u8  read_bl_len;
+    bool read_bl_partial;
+    bool write_blk_misalign;
+    bool read_blk_misalign;
+    bool dsr_imp;
+    u32 c_size;
+    u8  vdd_r_curr_min;
+    u8  vdd_r_curr_max;
+    u8  vdd_w_curr_min;
+    u8  vdd_w_curr_max;
+    u8  c_size_mult;
+    u8  erase_grp_size;
+    u8  erase_grp_mult;
+    u8  wp_grp_size;
+    bool wp_grp_enable;
+    u8  default_ecc;
+    u8  r2w_factor;
+    u8  write_bl_len;
+    bool write_bl_partial;
+    bool content_prot_app;
+    bool file_format_grp;
+    bool copy;
+    bool perm_write_protect;
+    bool tmp_write_protect;
+    u8  file_format;
+    u8  ecc;
+    u8  crc;
+} emmc_csd_t;
+
+/* EXT_CSD key fields */
+typedef struct {
+    u8  ext_csd_rev;
+    u8  csd_structure;
+    u8  card_type;
+    u8  pwr_cl_52_195;
+    u8  pwr_cl_26_195;
+    u8  pwr_cl_52_360;
+    u8  pwr_cl_26_360;
+    u8  min_perf_r_4_26;
+    u8  min_perf_w_4_26;
+    u8  min_perf_r_8_26_4_52;
+    u8  min_perf_w_8_26_4_52;
+    u8  min_perf_r_8_52;
+    u8  min_perf_w_8_52;
+    u32 sec_count;
+    u8  sleep_current_vcc;
+    u8  sleep_current_vccq;
+    u8  sleep_awake_timeout;
+    u32 hc_wp_grp_size;
+    u8  rel_wr_sec_c;
+    u8  erase_timeout_mult;
+    u8  hc_erase_grp_size;
+    u8  acc_size;
+    u8  boot_mult;
+    u8  boot_info;
+    u8  sec_trim_mult;
+    u8  sec_erase_mult;
+    u8  sec_feature_support;
+    u8  trim_mult;
+    u8  pwr_cl_200_195;
+    u8  pwr_cl_200_360;
+    u8  pwr_cl_ddr_52_195;
+    u8  pwr_cl_ddr_52_360;
+    u8  cache_flush_policy;
+    u8  ini_timeout_ap;
+    u32 correct_prg_sectors_num;
+    u8  bkops_en;
+    u8  bkops_start;
+    u8  sanitize_start;
+    u8  wr_rel_param;
+    u8  wr_rel_set;
+    u8  rpmb_size_mult;
+    u8  fw_config;
+    u8  user_wp;
+    u8  boot_wp;
+    u8  boot_wp_status;
+    u8  erase_group_def;
+    u8  boot_bus_conditions;
+    u8  boot_config_prot;
+    u8  partition_config;
+    u8  erased_mem_cont;
+    u8  bus_width;
+    u8  strobe_support;
+    u8  hs_timing;
+    u8  power_class;
+    u8  cmd_set_rev;
+    u8  cmd_set;
+} emmc_ext_csd_t;
+
+/* eMMC card info */
+typedef struct {
+    emmc_cid_t      cid;
+    emmc_csd_t      csd;
+    emmc_ext_csd_t  ext_csd;
+    u16             rca;
+    u32             ocr;
+    u64             capacity;
+    emmc_state_t    state;
+    emmc_partition_t active_partition;
+    emmc_bus_mode_t  bus_mode;
+    emmc_bus_width_t bus_width;
+    u32             clock_freq;
+    bool            initialized;
+} emmc_card_info_t;
+
+#endif /* EMMC_TYPES_H */
