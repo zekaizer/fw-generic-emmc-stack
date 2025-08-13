@@ -7,6 +7,7 @@
 
 #include "../src/protocol/emmc_protocol.h"
 #include <string.h>
+#include <stdio.h>
 
 /* Example platform-specific HAL configuration */
 static hal_emmc_config_t example_hal_config = {
@@ -197,6 +198,22 @@ emmc_result_t example_performance_test(void)
 }
 
 /*
+ * Helper function to generate device-unique key (placeholder)
+ */
+static void generate_device_unique_key(u8 *key)
+{
+    /* In real implementation, this would derive a key from:
+     * - Device serial number
+     * - Hardware security module
+     * - OTP (One-Time Programmable) memory
+     * - Secure boot chain
+     */
+    for (int i = 0; i < 32; i++) {
+        key[i] = (u8)(0xA5 ^ i); /* Simple pattern for example */
+    }
+}
+
+/*
  * Example RPMB initialization (requires external crypto implementation)
  */
 static emmc_result_t example_crypto_inject_key(const u8 *key, u32 key_len)
@@ -234,6 +251,64 @@ emmc_result_t example_rpmb_init(void)
     };
     
     return emmc_rpmb_init(&crypto_interface);
+}
+
+/*
+ * Example RPMB secure storage operations
+ */
+emmc_result_t example_rpmb_secure_storage_test(void)
+{
+    emmc_result_t result;
+    u8 authentication_key[32];
+    u8 secure_data[256];
+    u8 read_buffer[256];
+    u32 write_counter;
+    
+    /* Generate device-specific authentication key */
+    generate_device_unique_key(authentication_key);
+    
+    /* Initialize RPMB */
+    result = example_rpmb_init();
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Program authentication key (one-time operation) */
+    result = emmc_rpmb_program_key(authentication_key);
+    if (result != EMMC_OK) {
+        /* Key might already be programmed - continue */
+    }
+    
+    /* Check write counter */
+    result = emmc_rpmb_get_write_counter(&write_counter);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Prepare secure data */
+    memset(secure_data, 0, sizeof(secure_data));
+    snprintf((char*)secure_data, sizeof(secure_data), 
+             "Confidential data - Write Counter: %u", write_counter);
+    
+    /* Write secure data to RPMB */
+    result = emmc_rpmb_write_data(0, secure_data, 1, authentication_key);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Read and verify secure data */
+    memset(read_buffer, 0, sizeof(read_buffer));
+    result = emmc_rpmb_read_data(0, read_buffer, 1, authentication_key);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Verify data integrity */
+    if (memcmp(secure_data, read_buffer, sizeof(secure_data)) != 0) {
+        return EMMC_ERROR; /* Data corruption detected */
+    }
+    
+    return EMMC_OK;
 }
 
 /*
@@ -283,6 +358,13 @@ int example_main(void)
     result = example_rpmb_init();
     if (result != EMMC_OK) {
         /* RPMB initialization failed - continue without RPMB */
+    } else {
+        /* Test RPMB secure storage */
+        result = example_rpmb_secure_storage_test();
+        if (result != EMMC_OK) {
+            /* Handle RPMB test error */
+            return -5;
+        }
     }
     
     /* Cleanup */
