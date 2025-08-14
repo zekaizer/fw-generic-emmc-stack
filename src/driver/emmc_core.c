@@ -253,26 +253,21 @@ emmc_result_t emmc_card_initialize(void)
     g_emmc_ctx.card_info.ocr = ocr;
     
     /* Get CID */
-#if EMMC_COMPILE_CID_PARSING
     result = emmc_send_command(EMMC_CMD2, 0, EMMC_RESP_R2, response);
     if (result != EMMC_OK) {
         return result;
     }
     
-    result = emmc_parse_cid(response, &g_emmc_ctx.card_info.cid);
-    if (result != EMMC_OK) {
-        return result;
+    if (EMMC_COMPILE_CID_PARSING) {
+        result = emmc_parse_cid(response, &g_emmc_ctx.card_info.cid);
+        if (result != EMMC_OK) {
+            return result;
+        }
+    } else {
+        /* Set minimal CID information */
+        g_emmc_ctx.card_info.cid.manufacturer_id = 0x00;
+        g_emmc_ctx.card_info.cid.product_serial = 0x00000000;
     }
-#else
-    /* Skip CID parsing in minimal configuration */
-    result = emmc_send_command(EMMC_CMD2, 0, EMMC_RESP_R2, response);
-    if (result != EMMC_OK) {
-        return result;
-    }
-    /* Set minimal CID information */
-    g_emmc_ctx.card_info.cid.manufacturer_id = 0x00;
-    g_emmc_ctx.card_info.cid.product_serial = 0x00000000;
-#endif
     
     /* Set RCA */
     result = emmc_send_command(EMMC_CMD3, (u32)rca << 16, EMMC_RESP_R1, response);
@@ -283,26 +278,21 @@ emmc_result_t emmc_card_initialize(void)
     g_emmc_ctx.card_info.rca = rca;
     
     /* Get CSD */
-#if EMMC_COMPILE_CSD_PARSING
     result = emmc_send_command(EMMC_CMD9, (u32)rca << 16, EMMC_RESP_R2, response);
     if (result != EMMC_OK) {
         return result;
     }
     
-    result = emmc_parse_csd(response, &g_emmc_ctx.card_info.csd);
-    if (result != EMMC_OK) {
-        return result;
+    if (EMMC_COMPILE_CSD_PARSING) {
+        result = emmc_parse_csd(response, &g_emmc_ctx.card_info.csd);
+        if (result != EMMC_OK) {
+            return result;
+        }
+    } else {
+        /* Set minimal CSD information */
+        g_emmc_ctx.card_info.csd.sector_size = EMMC_STATIC_SECTOR_SIZE;
+        g_emmc_ctx.card_info.csd.capacity_sectors = 0; /* Will be set from EXT_CSD or defaults */
     }
-#else
-    /* Skip CSD parsing in minimal configuration */
-    result = emmc_send_command(EMMC_CMD9, (u32)rca << 16, EMMC_RESP_R2, response);
-    if (result != EMMC_OK) {
-        return result;
-    }
-    /* Set minimal CSD information */
-    g_emmc_ctx.card_info.csd.sector_size = EMMC_STATIC_SECTOR_SIZE;
-    g_emmc_ctx.card_info.csd.capacity_sectors = 0; /* Will be set from EXT_CSD or defaults */
-#endif
     
     /* Select card */
     result = emmc_send_command(EMMC_CMD7, (u32)rca << 16, EMMC_RESP_R1B, response);
@@ -317,79 +307,112 @@ emmc_result_t emmc_card_initialize(void)
     }
     
     /* Read EXT_CSD */
-#if EMMC_COMPILE_EXT_CSD_PARSING
-    u8 ext_csd_buffer[512];
-    result = emmc_send_command_with_data(EMMC_CMD8, 0, EMMC_RESP_R1,
-                                        ext_csd_buffer, 512, 1, true, response);
-    if (result != EMMC_OK) {
-        return result;
-    }
-    
-    result = emmc_parse_ext_csd(ext_csd_buffer, &g_emmc_ctx.card_info.ext_csd);
-    if (result != EMMC_OK) {
-        return result;
-    }
-    
-    /* Calculate capacity */
-    g_emmc_ctx.card_info.capacity = emmc_calculate_capacity(&g_emmc_ctx.card_info.csd,
-                                                           &g_emmc_ctx.card_info.ext_csd);
-#else
-    /* Skip EXT_CSD parsing - use static defaults */
-    /* Initialize EXT_CSD with default values */
-    memset(&g_emmc_ctx.card_info.ext_csd, 0, sizeof(emmc_ext_csd_t));
-    
-    /* Set static configuration values */
-    #ifdef EMMC_STATIC_SECTOR_COUNT
-        g_emmc_ctx.card_info.capacity = EMMC_STATIC_SECTOR_COUNT * EMMC_STATIC_SECTOR_SIZE;
-    #else
-        g_emmc_ctx.card_info.capacity = 8ULL * 1024 * 1024 * 1024; /* Default: 8GB */
-    #endif
-    
-    #ifdef EMMC_STATIC_BUS_MODE
-        /* Set static bus mode support */
-        #if (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400_ES)
-            g_emmc_ctx.card_info.ext_csd.card_type = 0x07; /* HS200 + HS400 + Enhanced Strobe */
+    if (EMMC_COMPILE_EXT_CSD_PARSING) {
+        u8 ext_csd_buffer[512];
+        result = emmc_send_command_with_data(EMMC_CMD8, 0, EMMC_RESP_R1,
+                                            ext_csd_buffer, 512, 1, true, response);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = emmc_parse_ext_csd(ext_csd_buffer, &g_emmc_ctx.card_info.ext_csd);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        /* Calculate capacity */
+        g_emmc_ctx.card_info.capacity = emmc_calculate_capacity(&g_emmc_ctx.card_info.csd,
+                                                               &g_emmc_ctx.card_info.ext_csd);
+    } else {
+        /* Skip EXT_CSD parsing - use static defaults */
+        /* Initialize EXT_CSD with default values */
+        memset(&g_emmc_ctx.card_info.ext_csd, 0, sizeof(emmc_ext_csd_t));
+        
+        /* Set static configuration values */
+        #ifdef EMMC_STATIC_SECTOR_COUNT
+            g_emmc_ctx.card_info.capacity = EMMC_STATIC_SECTOR_COUNT * EMMC_STATIC_SECTOR_SIZE;
+        #else
+            g_emmc_ctx.card_info.capacity = 8ULL * 1024 * 1024 * 1024; /* Default: 8GB */
+        #endif
+        
+        #ifdef EMMC_STATIC_BUS_MODE
+            /* Set static bus mode support */
+            #if (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400_ES)
+                g_emmc_ctx.card_info.ext_csd.card_type = 0x07; /* HS200 + HS400 + Enhanced Strobe */
+                g_emmc_ctx.card_info.ext_csd.strobe_support = 0x01;
+            #elif (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400)
+                g_emmc_ctx.card_info.ext_csd.card_type = 0x03; /* HS200 + HS400 */
+            #elif (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS200)
+                g_emmc_ctx.card_info.ext_csd.card_type = 0x02; /* HS200 */
+            #else
+                g_emmc_ctx.card_info.ext_csd.card_type = 0x01; /* SDR/HS */
+            #endif
+        #else
+            g_emmc_ctx.card_info.ext_csd.card_type = 0x07; /* Support all modes */
             g_emmc_ctx.card_info.ext_csd.strobe_support = 0x01;
-        #elif (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400)
-            g_emmc_ctx.card_info.ext_csd.card_type = 0x03; /* HS200 + HS400 */
-        #elif (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS200)
-            g_emmc_ctx.card_info.ext_csd.card_type = 0x02; /* HS200 */
-        #else
-            g_emmc_ctx.card_info.ext_csd.card_type = 0x01; /* SDR/HS */
         #endif
-    #else
-        g_emmc_ctx.card_info.ext_csd.card_type = 0x07; /* Support all modes */
-        g_emmc_ctx.card_info.ext_csd.strobe_support = 0x01;
-    #endif
-    
-    /* Set partition configuration */
-    g_emmc_ctx.card_info.ext_csd.partition_config = 0x00; /* User partition active */
-    
-    #if EMMC_COMPILE_BOOT_PARTITION
-        #ifdef EMMC_STATIC_BOOT_SIZE
-            g_emmc_ctx.card_info.ext_csd.boot_size_mult = EMMC_STATIC_BOOT_SIZE / (128 * 1024);
-        #else
-            g_emmc_ctx.card_info.ext_csd.boot_size_mult = 32; /* Default: 4MB */
-        #endif
-    #endif
-    
-    #if EMMC_COMPILE_RPMB
-        #ifdef EMMC_STATIC_RPMB_SIZE
-            g_emmc_ctx.card_info.ext_csd.rpmb_size_mult = EMMC_STATIC_RPMB_SIZE / (128 * 1024);
-        #else
-            g_emmc_ctx.card_info.ext_csd.rpmb_size_mult = 32; /* Default: 4MB */
-        #endif
-    #endif
-#endif
+        
+        /* Set partition configuration */
+        g_emmc_ctx.card_info.ext_csd.partition_config = 0x00; /* User partition active */
+        
+        if (EMMC_COMPILE_BOOT_PARTITION) {
+            #ifdef EMMC_STATIC_BOOT_SIZE
+                g_emmc_ctx.card_info.ext_csd.boot_size_mult = EMMC_STATIC_BOOT_SIZE / (128 * 1024);
+            #else
+                g_emmc_ctx.card_info.ext_csd.boot_size_mult = 32; /* Default: 4MB */
+            #endif
+        }
+        
+        if (EMMC_COMPILE_RPMB) {
+            #ifdef EMMC_STATIC_RPMB_SIZE
+                g_emmc_ctx.card_info.ext_csd.rpmb_size_mult = EMMC_STATIC_RPMB_SIZE / (128 * 1024);
+            #else
+                g_emmc_ctx.card_info.ext_csd.rpmb_size_mult = 32; /* Default: 4MB */
+            #endif
+        }
+    }
     
     /* Set initial state */
     g_emmc_ctx.card_info.state = EMMC_STATE_TRAN;
     g_emmc_ctx.card_info.active_partition = EMMC_PART_USER;
+    
+    /* Set initial bus configuration */
+#ifdef EMMC_STATIC_BUS_MODE
+    g_emmc_ctx.card_info.bus_mode = EMMC_STATIC_BUS_MODE;
+#else
     g_emmc_ctx.card_info.bus_mode = EMMC_MODE_SDR;
+#endif
+
+#ifdef EMMC_STATIC_BUS_WIDTH
+    g_emmc_ctx.card_info.bus_width = EMMC_STATIC_BUS_WIDTH;
+#else
     g_emmc_ctx.card_info.bus_width = EMMC_BUS_WIDTH_1;
+#endif
+
     g_emmc_ctx.card_info.clock_freq = g_emmc_ctx.current_clock;
-    g_emmc_ctx.card_info.enhanced_strobe = false;
+    
+    if (EMMC_HAS_STATIC_BUS_MODE && (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400_ES)) {
+        g_emmc_ctx.card_info.enhanced_strobe = true;
+    } else {
+        g_emmc_ctx.card_info.enhanced_strobe = false;
+    }
+
     g_emmc_ctx.card_info.initialized = true;
+    
+    /* Apply static bus configuration immediately */
+    if (EMMC_HAS_STATIC_BUS_MODE) {
+        result = hal_emmc_set_timing(EMMC_STATIC_BUS_MODE);
+        if (result != EMMC_OK) {
+            return result;
+        }
+    }
+
+    if (EMMC_HAS_STATIC_BUS_WIDTH) {
+        result = hal_emmc_set_bus_width(EMMC_STATIC_BUS_WIDTH);
+        if (result != EMMC_OK) {
+            return result;
+        }
+    }
     
     return EMMC_OK;
 }
@@ -716,90 +739,102 @@ emmc_result_t emmc_switch_mode(u8 access_mode, u8 index, u8 value, u32 timeout_m
 
 emmc_result_t emmc_set_bus_width(emmc_bus_width_t width)
 {
-    emmc_result_t result;
-    u8 bus_width_value;
-    
-    if (!g_emmc_ctx.initialized) {
-        return EMMC_NOT_READY;
+    if (EMMC_COMPILE_DYNAMIC_BUS_WIDTH) {
+        emmc_result_t result;
+        u8 bus_width_value;
+        
+        if (!g_emmc_ctx.initialized) {
+            return EMMC_NOT_READY;
+        }
+        
+        /* Map bus width enum to EXT_CSD value */
+        switch (width) {
+            case EMMC_BUS_WIDTH_1:
+                bus_width_value = 0;
+                break;
+            case EMMC_BUS_WIDTH_4:
+                bus_width_value = 1;
+                break;
+            case EMMC_BUS_WIDTH_8:
+                bus_width_value = 2;
+                break;
+            default:
+                return EMMC_INVALID_PARAM;
+        }
+        
+        /* Set bus width in card */
+        result = emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE, 
+                                 EXT_CSD_BUS_WIDTH, 
+                                 bus_width_value, 
+                                 EMMC_SWITCH_TIMEOUT_MS);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        /* Set bus width in controller */
+        result = hal_emmc_set_bus_width(width);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        g_emmc_ctx.card_info.bus_width = width;
+        return EMMC_OK;
+    } else {
+        /* Static bus width - no runtime change allowed */
+        (void)width;
+        return EMMC_NOT_SUPPORTED;
     }
-    
-    /* Map bus width enum to EXT_CSD value */
-    switch (width) {
-        case EMMC_BUS_WIDTH_1:
-            bus_width_value = 0;
-            break;
-        case EMMC_BUS_WIDTH_4:
-            bus_width_value = 1;
-            break;
-        case EMMC_BUS_WIDTH_8:
-            bus_width_value = 2;
-            break;
-        default:
-            return EMMC_INVALID_PARAM;
-    }
-    
-    /* Set bus width in card */
-    result = emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE, 
-                             EXT_CSD_BUS_WIDTH, 
-                             bus_width_value, 
-                             EMMC_SWITCH_TIMEOUT_MS);
-    if (result != EMMC_OK) {
-        return result;
-    }
-    
-    /* Set bus width in controller */
-    result = hal_emmc_set_bus_width(width);
-    if (result != EMMC_OK) {
-        return result;
-    }
-    
-    g_emmc_ctx.card_info.bus_width = width;
-    return EMMC_OK;
 }
 
 emmc_result_t emmc_set_timing_mode(emmc_bus_mode_t mode)
 {
-    emmc_result_t result;
-    u8 hs_timing_value;
-    
-    if (!g_emmc_ctx.initialized) {
-        return EMMC_NOT_READY;
+    if (EMMC_COMPILE_DYNAMIC_BUS_MODE) {
+        emmc_result_t result;
+        u8 hs_timing_value;
+        
+        if (!g_emmc_ctx.initialized) {
+            return EMMC_NOT_READY;
+        }
+        
+        /* Map timing mode to EXT_CSD HS_TIMING value */
+        switch (mode) {
+            case EMMC_MODE_SDR:
+                hs_timing_value = 0;
+                break;
+            case EMMC_MODE_HS200:
+                hs_timing_value = 2;
+                break;
+            case EMMC_MODE_HS400:
+            case EMMC_MODE_HS400_ES:
+                hs_timing_value = 3;
+                break;
+            default:
+                hs_timing_value = 1; /* High Speed */
+                break;
+        }
+        
+        /* Set timing mode in card */
+        result = emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE, 
+                                 EXT_CSD_HS_TIMING, 
+                                 hs_timing_value, 
+                                 EMMC_SWITCH_TIMEOUT_MS);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        /* Set timing mode in controller */
+        result = hal_emmc_set_timing(mode);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        g_emmc_ctx.card_info.bus_mode = mode;
+        return EMMC_OK;
+    } else {
+        /* Static bus mode - no runtime change allowed */
+        (void)mode;
+        return EMMC_NOT_SUPPORTED;
     }
-    
-    /* Map timing mode to EXT_CSD HS_TIMING value */
-    switch (mode) {
-        case EMMC_MODE_SDR:
-            hs_timing_value = 0;
-            break;
-        case EMMC_MODE_HS200:
-            hs_timing_value = 2;
-            break;
-        case EMMC_MODE_HS400:
-        case EMMC_MODE_HS400_ES:
-            hs_timing_value = 3;
-            break;
-        default:
-            hs_timing_value = 1; /* High Speed */
-            break;
-    }
-    
-    /* Set timing mode in card */
-    result = emmc_switch_mode(EMMC_SWITCH_MODE_WRITE_BYTE, 
-                             EXT_CSD_HS_TIMING, 
-                             hs_timing_value, 
-                             EMMC_SWITCH_TIMEOUT_MS);
-    if (result != EMMC_OK) {
-        return result;
-    }
-    
-    /* Set timing mode in controller */
-    result = hal_emmc_set_timing(mode);
-    if (result != EMMC_OK) {
-        return result;
-    }
-    
-    g_emmc_ctx.card_info.bus_mode = mode;
-    return EMMC_OK;
 }
 
 emmc_result_t emmc_set_block_length(u32 block_len)

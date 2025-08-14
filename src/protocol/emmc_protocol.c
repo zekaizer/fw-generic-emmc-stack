@@ -130,12 +130,12 @@ emmc_result_t emmc_block_io(const emmc_block_request_t *request)
     
 max_transfer = (request->sector_count > 1) ? EMMC_MAX_MULTI_TRANSFER : EMMC_MAX_SINGLE_TRANSFER;
     
-#if EMMC_COMPILE_CMD23_SUPPORT
-    /* For large transfers, use predefined block count (CMD23) for better performance */
-    if (remaining_sectors > g_protocol_ctx.optimal_transfer_size / 4) {
-        use_predefined_count = true;
+    if (EMMC_COMPILE_CMD23_SUPPORT) {
+        /* For large transfers, use predefined block count (CMD23) for better performance */
+        if (remaining_sectors > g_protocol_ctx.optimal_transfer_size / 4) {
+            use_predefined_count = true;
+        }
     }
-#endif
     
     remaining_sectors = request->sector_count;
     current_sector = request->start_sector;
@@ -163,40 +163,40 @@ max_transfer = (request->sector_count > 1) ? EMMC_MAX_MULTI_TRANSFER : EMMC_MAX_
             u8 cmd_index = request->read_operation ? EMMC_CMD18 : EMMC_CMD25;
             u32 lba = emmc_sector_to_lba(current_sector);
             
-#if EMMC_COMPILE_CMD23_SUPPORT
-            u32 cmd23_arg = transfer_sectors;
-            
-            /* Set predefined block count (CMD23) for better performance and reliability */
-            if (use_predefined_count || request->reliable_write) {
-                /* For reliable write, set bit 31 to indicate reliable write */
-                if (request->reliable_write) {
-                    cmd23_arg |= (1U << 31);
-                }
+            if (EMMC_COMPILE_CMD23_SUPPORT) {
+                u32 cmd23_arg = transfer_sectors;
                 
-                result = emmc_send_command(EMMC_CMD23, cmd23_arg, EMMC_RESP_R1, NULL);
-                if (result != EMMC_OK) {
-                    return result;
+                /* Set predefined block count (CMD23) for better performance and reliability */
+                if (use_predefined_count || request->reliable_write) {
+                    /* For reliable write, set bit 31 to indicate reliable write */
+                    if (request->reliable_write) {
+                        cmd23_arg |= (1U << 31);
+                    }
+                    
+                    result = emmc_send_command(EMMC_CMD23, cmd23_arg, EMMC_RESP_R1, NULL);
+                    if (result != EMMC_OK) {
+                        return result;
+                    }
                 }
             }
-#endif
             
             result = emmc_send_command_with_data(cmd_index, lba, EMMC_RESP_R1,
                                                current_buffer, EMMC_SECTOR_SIZE,
                                                transfer_sectors, request->read_operation, NULL);
             
-#if EMMC_COMPILE_CMD23_SUPPORT
-            /* Send stop command only if CMD23 was not used (no predefined count) */
-            if (result == EMMC_OK && !use_predefined_count && !request->reliable_write) {
-                u32 stop_response;
-                emmc_send_command(EMMC_CMD12, 0, EMMC_RESP_R1B, &stop_response);
+            if (EMMC_COMPILE_CMD23_SUPPORT) {
+                /* Send stop command only if CMD23 was not used (no predefined count) */
+                if (result == EMMC_OK && !use_predefined_count && !request->reliable_write) {
+                    u32 stop_response;
+                    emmc_send_command(EMMC_CMD12, 0, EMMC_RESP_R1B, &stop_response);
+                }
+            } else {
+                /* Always send stop command if CMD23 is not supported */
+                if (result == EMMC_OK) {
+                    u32 stop_response;
+                    emmc_send_command(EMMC_CMD12, 0, EMMC_RESP_R1B, &stop_response);
+                }
             }
-#else
-            /* Always send stop command if CMD23 is not supported */
-            if (result == EMMC_OK) {
-                u32 stop_response;
-                emmc_send_command(EMMC_CMD12, 0, EMMC_RESP_R1B, &stop_response);
-            }
-#endif
         }
         
         if (result != EMMC_OK) {
@@ -309,7 +309,7 @@ emmc_result_t emmc_get_partition_size(emmc_partition_t partition, u64 *size_byte
 
 emmc_result_t emmc_optimize_performance(void)
 {
-    emmc_result_t result;
+    emmc_result_t result = EMMC_OK;
     const emmc_driver_context_t *ctx;
     const emmc_ext_csd_t *ext_csd;
     emmc_bus_width_t target_width;
@@ -319,6 +319,12 @@ emmc_result_t emmc_optimize_performance(void)
         return EMMC_NOT_READY;
     }
     
+    /* Static configuration - compiler will eliminate dead code */
+    if (EMMC_HAS_STATIC_BUS_MODE && EMMC_HAS_STATIC_BUS_WIDTH) {
+        /* Already statically configured - no optimization needed */
+        return EMMC_OK;
+    }
+    
     ctx = emmc_driver_get_context();
     if (!ctx || !ctx->card_info.initialized) {
         return EMMC_NOT_READY;
@@ -326,65 +332,74 @@ emmc_result_t emmc_optimize_performance(void)
     
     ext_csd = &ctx->card_info.ext_csd;
     
-    /* Determine optimal bus width */
-    if (ctx->hal_config.max_bus_width >= 8) {
-        target_width = EMMC_BUS_WIDTH_8;
-    } else if (ctx->hal_config.max_bus_width >= 4) {
-        target_width = EMMC_BUS_WIDTH_4;
+    /* Determine optimal bus width - only if not statically configured */
+    if (!EMMC_HAS_STATIC_BUS_WIDTH) {
+        if (ctx->hal_config.max_bus_width >= 8) {
+            target_width = EMMC_BUS_WIDTH_8;
+        } else if (ctx->hal_config.max_bus_width >= 4) {
+            target_width = EMMC_BUS_WIDTH_4;
+        } else {
+            target_width = EMMC_BUS_WIDTH_1;
+        }
     } else {
-        target_width = EMMC_BUS_WIDTH_1;
+        target_width = (emmc_bus_width_t)EMMC_STATIC_BUS_WIDTH;
     }
     
-    /* Determine optimal timing mode based on card capabilities */
-    target_mode = EMMC_MODE_SDR; /* Start with legacy */
-    
-    /* Check for Enhanced Strobe support (highest priority) */
-    if ((ext_csd->card_type & 0x04) && (ext_csd->strobe_support & 0x01)) {
-        /* Supports HS400 Enhanced Strobe - best performance */
-        target_mode = EMMC_MODE_HS400_ES;
-    } else if (ext_csd->card_type & 0x04) {
-        /* Supports HS200/HS400 */
-        target_mode = EMMC_MODE_HS400;
-    } else if (ext_csd->card_type & 0x02) {
-        /* Supports 52MHz */
-        target_mode = EMMC_MODE_SDR;
+    /* Determine optimal timing mode - only if not statically configured */
+    if (!EMMC_HAS_STATIC_BUS_MODE) {
+        target_mode = EMMC_MODE_SDR; /* Start with legacy */
+        
+        /* Check for Enhanced Strobe support (highest priority) */
+        if ((ext_csd->card_type & 0x04) && (ext_csd->strobe_support & 0x01)) {
+            target_mode = EMMC_MODE_HS400_ES;
+        } else if (ext_csd->card_type & 0x04) {
+            target_mode = EMMC_MODE_HS400;
+        } else if (ext_csd->card_type & 0x02) {
+            target_mode = EMMC_MODE_SDR;
+        }
+    } else {
+        target_mode = (emmc_bus_mode_t)EMMC_STATIC_BUS_MODE;
     }
     
-    /* Set bus configuration */
-    result = emmc_set_bus_config(target_width, target_mode);
-    if (result != EMMC_OK) {
-        /* Try fallback configurations in order of preference */
-        if (target_mode == EMMC_MODE_HS400_ES) {
-            result = emmc_set_bus_config(target_width, EMMC_MODE_HS400);
-        }
-        if (result != EMMC_OK && (target_mode == EMMC_MODE_HS400 || target_mode == EMMC_MODE_HS400_ES)) {
-            result = emmc_set_bus_config(target_width, EMMC_MODE_HS200);
-        }
-        if (result != EMMC_OK && target_mode == EMMC_MODE_HS200) {
-            result = emmc_set_bus_config(target_width, EMMC_MODE_SDR);
+    /* Set bus configuration - only if dynamic negotiation needed */
+    if (!EMMC_HAS_STATIC_BUS_MODE || !EMMC_HAS_STATIC_BUS_WIDTH) {
+        result = emmc_set_bus_config(target_width, target_mode);
+        
+        /* Fallback logic - only for dynamic configuration */
+        if (result != EMMC_OK && !EMMC_HAS_STATIC_BUS_MODE) {
+            if (target_mode == EMMC_MODE_HS400_ES) {
+                result = emmc_set_bus_config(target_width, EMMC_MODE_HS400);
+            }
+            if (result != EMMC_OK && (target_mode == EMMC_MODE_HS400 || target_mode == EMMC_MODE_HS400_ES)) {
+                result = emmc_set_bus_config(target_width, EMMC_MODE_HS200);
+            }
+            if (result != EMMC_OK) {
+                result = emmc_set_bus_config(target_width, EMMC_MODE_SDR);
+            }
         }
         
-        if (result != EMMC_OK && target_width == EMMC_BUS_WIDTH_8) {
+        if (result != EMMC_OK && !EMMC_HAS_STATIC_BUS_WIDTH && target_width == EMMC_BUS_WIDTH_8) {
             result = emmc_set_bus_config(EMMC_BUS_WIDTH_4, target_mode);
         }
         
-        if (result != EMMC_OK) {
+        if (result != EMMC_OK && !EMMC_HAS_STATIC_BUS_MODE && !EMMC_HAS_STATIC_BUS_WIDTH) {
             result = emmc_set_bus_config(EMMC_BUS_WIDTH_1, EMMC_MODE_SDR);
         }
     }
     
-    
-    /* Calculate optimal transfer size based on bus configuration */
-    switch (target_width) {
-        case EMMC_BUS_WIDTH_8:
-            g_protocol_ctx.optimal_transfer_size = 1024; /* 512KB */
-            break;
-        case EMMC_BUS_WIDTH_4:
-            g_protocol_ctx.optimal_transfer_size = 512; /* 256KB */
-            break;
-        default:
-            g_protocol_ctx.optimal_transfer_size = 256; /* 128KB */
-            break;
+    /* Calculate optimal transfer size - only if not statically configured */
+    if (!__builtin_constant_p(g_protocol_ctx.optimal_transfer_size) || g_protocol_ctx.optimal_transfer_size == 256) {
+        switch (target_width) {
+            case EMMC_BUS_WIDTH_8:
+                g_protocol_ctx.optimal_transfer_size = 1024; /* 512KB */
+                break;
+            case EMMC_BUS_WIDTH_4:
+                g_protocol_ctx.optimal_transfer_size = 512; /* 256KB */
+                break;
+            default:
+                g_protocol_ctx.optimal_transfer_size = 256; /* 128KB */
+                break;
+        }
     }
     
     return result;

@@ -4,10 +4,8 @@
 #include "../include/emmc_types.h"
 #include "../driver/emmc_core.h"
 
-/* Include RPMB interface if enabled */
-#if EMMC_COMPILE_RPMB
+/* Include RPMB interface - always included, conditionally used */
 #include "emmc_rpmb.h"
-#endif
 
 /* Protocol layer initialization configuration */
 typedef struct {

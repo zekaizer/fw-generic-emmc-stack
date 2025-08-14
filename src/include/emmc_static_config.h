@@ -24,55 +24,28 @@
 
 /* Static bus mode - eliminates mode negotiation code */
 #ifdef EMMC_STATIC_BUS_MODE
-    #if (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400_ES)
-        #define EMMC_COMPILE_HS400ES_ONLY    1
-        #define EMMC_COMPILE_HS400_ONLY      0
-        #define EMMC_COMPILE_HS200_ONLY      0
-        #define EMMC_COMPILE_SDR_ONLY        0
-    #elif (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400)
-        #define EMMC_COMPILE_HS400ES_ONLY    0
-        #define EMMC_COMPILE_HS400_ONLY      1
-        #define EMMC_COMPILE_HS200_ONLY      0
-        #define EMMC_COMPILE_SDR_ONLY        0
-    #elif (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS200)
-        #define EMMC_COMPILE_HS400ES_ONLY    0
-        #define EMMC_COMPILE_HS400_ONLY      0
-        #define EMMC_COMPILE_HS200_ONLY      1
-        #define EMMC_COMPILE_SDR_ONLY        0
-    #else
-        #define EMMC_COMPILE_HS400ES_ONLY    0
-        #define EMMC_COMPILE_HS400_ONLY      0
-        #define EMMC_COMPILE_HS200_ONLY      0
-        #define EMMC_COMPILE_SDR_ONLY        1
-    #endif
+    static const bool EMMC_COMPILE_HS400ES_ONLY = (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400_ES);
+    static const bool EMMC_COMPILE_HS400_ONLY = (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400);
+    static const bool EMMC_COMPILE_HS200_ONLY = (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS200);
+    static const bool EMMC_COMPILE_SDR_ONLY = (!EMMC_COMPILE_HS400ES_ONLY && !EMMC_COMPILE_HS400_ONLY && !EMMC_COMPILE_HS200_ONLY);
 #else
     /* Dynamic mode selection (default) */
-    #define EMMC_COMPILE_HS400ES_ONLY    0
-    #define EMMC_COMPILE_HS400_ONLY      0
-    #define EMMC_COMPILE_HS200_ONLY      0
-    #define EMMC_COMPILE_SDR_ONLY        0
+    static const bool EMMC_COMPILE_HS400ES_ONLY = false;
+    static const bool EMMC_COMPILE_HS400_ONLY = false;
+    static const bool EMMC_COMPILE_HS200_ONLY = false;
+    static const bool EMMC_COMPILE_SDR_ONLY = false;
 #endif
 
 /* Static bus width - eliminates width negotiation code */
 #ifdef EMMC_STATIC_BUS_WIDTH
-    #if (EMMC_STATIC_BUS_WIDTH == 8)
-        #define EMMC_COMPILE_8BIT_ONLY       1
-        #define EMMC_COMPILE_4BIT_ONLY       0
-        #define EMMC_COMPILE_1BIT_ONLY       0
-    #elif (EMMC_STATIC_BUS_WIDTH == 4)
-        #define EMMC_COMPILE_8BIT_ONLY       0
-        #define EMMC_COMPILE_4BIT_ONLY       1
-        #define EMMC_COMPILE_1BIT_ONLY       0
-    #else
-        #define EMMC_COMPILE_8BIT_ONLY       0
-        #define EMMC_COMPILE_4BIT_ONLY       0
-        #define EMMC_COMPILE_1BIT_ONLY       1
-    #endif
+    static const bool EMMC_COMPILE_8BIT_ONLY = (EMMC_STATIC_BUS_WIDTH == 8);
+    static const bool EMMC_COMPILE_4BIT_ONLY = (EMMC_STATIC_BUS_WIDTH == 4);
+    static const bool EMMC_COMPILE_1BIT_ONLY = (EMMC_STATIC_BUS_WIDTH == 1);
 #else
     /* Dynamic width selection (default) */
-    #define EMMC_COMPILE_8BIT_ONLY       0
-    #define EMMC_COMPILE_4BIT_ONLY       0
-    #define EMMC_COMPILE_1BIT_ONLY       0
+    static const bool EMMC_COMPILE_8BIT_ONLY = false;
+    static const bool EMMC_COMPILE_4BIT_ONLY = false;
+    static const bool EMMC_COMPILE_1BIT_ONLY = false;
 #endif
 
 /* ========================================================================= */
@@ -80,9 +53,9 @@
 /* ========================================================================= */
 
 /* All partitions are always supported */
-#define EMMC_COMPILE_BOOT_PARTITION  1
-#define EMMC_COMPILE_RPMB            1
-#define EMMC_COMPILE_GP_PARTITION    1
+static const bool EMMC_COMPILE_BOOT_PARTITION = true;
+static const bool EMMC_COMPILE_RPMB = true;
+static const bool EMMC_COMPILE_GP_PARTITION = true;
 
 /* ========================================================================= */
 /* Command Set Static Settings                                              */
@@ -96,20 +69,20 @@
 
 /* Disable EXT_CSD parsing - use hardcoded defaults */
 #ifdef EMMC_DISABLE_EXT_CSD
-    #define EMMC_COMPILE_EXT_CSD_PARSING  0
+    static const bool EMMC_COMPILE_EXT_CSD_PARSING = false;
     /* Use static defaults */
     #define EMMC_STATIC_SECTOR_COUNT     (8ULL * 1024 * 1024 * 1024 / 512) /* 8GB default */
     #define EMMC_STATIC_BOOT_SIZE        (4 * 1024 * 1024)                  /* 4MB default */
     #define EMMC_STATIC_RPMB_SIZE        (4 * 1024 * 1024)                  /* 4MB default */
 #else
-    #define EMMC_COMPILE_EXT_CSD_PARSING  1
+    static const bool EMMC_COMPILE_EXT_CSD_PARSING = true;
 #endif
 
 /* Disable card status checking - always assume ready */
 #ifdef EMMC_DISABLE_CARD_STATUS_CHECK
-    #define EMMC_COMPILE_STATUS_CHECK     0
+    static const bool EMMC_COMPILE_STATUS_CHECK = false;
 #else
-    #define EMMC_COMPILE_STATUS_CHECK     1
+    static const bool EMMC_COMPILE_STATUS_CHECK = true;
 #endif
 
 /* Static sector size (always 512 bytes for eMMC) */
@@ -119,11 +92,11 @@
 
 /* Disable CID/CSD parsing */
 #ifdef EMMC_DISABLE_CARD_IDENTIFICATION
-    #define EMMC_COMPILE_CID_PARSING      0
-    #define EMMC_COMPILE_CSD_PARSING      0
+    static const bool EMMC_COMPILE_CID_PARSING = false;
+    static const bool EMMC_COMPILE_CSD_PARSING = false;
 #else
-    #define EMMC_COMPILE_CID_PARSING      1
-    #define EMMC_COMPILE_CSD_PARSING      1
+    static const bool EMMC_COMPILE_CID_PARSING = true;
+    static const bool EMMC_COMPILE_CSD_PARSING = true;
 #endif
 
 /* ========================================================================= */
@@ -132,21 +105,21 @@
 
 /* Static transfer sizes - eliminate runtime calculation */
 #ifdef EMMC_STATIC_TRANSFER_SIZE
-    #define EMMC_COMPILE_DYNAMIC_TRANSFER_SIZE  0
+    static const bool EMMC_COMPILE_DYNAMIC_TRANSFER_SIZE = false;
     #define EMMC_OPTIMAL_TRANSFER_SIZE          EMMC_STATIC_TRANSFER_SIZE
 #else
-    #define EMMC_COMPILE_DYNAMIC_TRANSFER_SIZE  1
+    static const bool EMMC_COMPILE_DYNAMIC_TRANSFER_SIZE = true;
 #endif
 
 /* Disable CMD23 (Predefined block count) */
 #ifdef EMMC_DISABLE_CMD23
-    #define EMMC_COMPILE_CMD23_SUPPORT    0
+    static const bool EMMC_COMPILE_CMD23_SUPPORT = false;
 #else
-    #define EMMC_COMPILE_CMD23_SUPPORT    1
+    static const bool EMMC_COMPILE_CMD23_SUPPORT = true;
 #endif
 
 /* Always use multi-block transfers */
-#define EMMC_COMPILE_MULTI_BLOCK      1
+static const bool EMMC_COMPILE_MULTI_BLOCK = true;
 
 /* ========================================================================= */
 /* Error Handling Static Settings                                          */
@@ -154,18 +127,18 @@
 
 /* Minimal error handling - basic error codes only */
 #ifdef EMMC_MINIMAL_ERROR_HANDLING
-    #define EMMC_COMPILE_DETAILED_ERRORS  0
-    #define EMMC_COMPILE_ERROR_RECOVERY   0
+    static const bool EMMC_COMPILE_DETAILED_ERRORS = false;
+    static const bool EMMC_COMPILE_ERROR_RECOVERY = false;
 #else
-    #define EMMC_COMPILE_DETAILED_ERRORS  1
-    #define EMMC_COMPILE_ERROR_RECOVERY   1
+    static const bool EMMC_COMPILE_DETAILED_ERRORS = true;
+    static const bool EMMC_COMPILE_ERROR_RECOVERY = true;
 #endif
 
 /* Disable timeout handling - assume operations always succeed */
 #ifdef EMMC_DISABLE_TIMEOUT_HANDLING
-    #define EMMC_COMPILE_TIMEOUT_HANDLING 0
+    static const bool EMMC_COMPILE_TIMEOUT_HANDLING = false;
 #else
-    #define EMMC_COMPILE_TIMEOUT_HANDLING 1
+    static const bool EMMC_COMPILE_TIMEOUT_HANDLING = true;
 #endif
 
 /* ========================================================================= */
@@ -179,8 +152,28 @@
 /* Function inlining hints for static configurations */
 #ifdef EMMC_STATIC_BUS_MODE
     #define EMMC_STATIC_INLINE_BUS_CONFIG __attribute__((always_inline)) static inline
+    static const bool EMMC_COMPILE_DYNAMIC_BUS_MODE = false;
 #else
     #define EMMC_STATIC_INLINE_BUS_CONFIG static inline
+    static const bool EMMC_COMPILE_DYNAMIC_BUS_MODE = true;
+#endif
+
+/* Bus width optimization flags */
+#ifdef EMMC_STATIC_BUS_WIDTH
+    static const bool EMMC_COMPILE_DYNAMIC_BUS_WIDTH = false;
+    static const bool EMMC_HAS_STATIC_BUS_WIDTH = true;
+#else
+    static const bool EMMC_COMPILE_DYNAMIC_BUS_WIDTH = true;
+    static const bool EMMC_HAS_STATIC_BUS_WIDTH = false;
+    #define EMMC_STATIC_BUS_WIDTH             0
+#endif
+
+/* Bus mode optimization flags */
+#ifdef EMMC_STATIC_BUS_MODE
+    static const bool EMMC_HAS_STATIC_BUS_MODE = true;
+#else
+    static const bool EMMC_HAS_STATIC_BUS_MODE = false;
+    #define EMMC_STATIC_BUS_MODE              0
 #endif
 
 /* Dead code elimination helpers */
