@@ -80,50 +80,29 @@ emmc_result_t emmc_rpmb_program_key(const u8 *key);
 emmc_result_t emmc_rpmb_get_write_counter(u32 *counter);
 
 /**
- * @brief Write data to RPMB partition
+ * @brief Write data to RPMB partition (single/multi-block optimized)
  * @param address Block address (0-based)
  * @param data Data to write (256 bytes per block)
  * @param block_count Number of blocks to write (max: EMMC_RPMB_MAX_BLOCKS)
  * @return EMMC_OK on success, error code otherwise
  * 
- * Note: Uses key from crypto interface. Key must be available via get_key().
+ * Note: Uses key from crypto interface. Optimized for both single and multi-block
+ * operations. Batches operations and uses streaming HMAC for efficiency.
  */
 emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count);
 
 /**
- * @brief Read data from RPMB partition
+ * @brief Read data from RPMB partition (single/multi-block optimized)
  * @param address Block address (0-based)
  * @param data Buffer to store read data (256 bytes per block)
  * @param block_count Number of blocks to read (max: EMMC_RPMB_MAX_BLOCKS)
  * @return EMMC_OK on success, error code otherwise
  * 
- * Note: Uses key from crypto interface. Key must be available via get_key().
+ * Note: Uses key from crypto interface. Optimized for both single and multi-block
+ * operations. Reads all blocks in single transaction for best performance.
  */
 emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count);
 
-/**
- * @brief Write multiple data blocks to RPMB partition (optimized)
- * @param address Starting block address (0-based)
- * @param data Data to write (256 bytes per block)
- * @param block_count Number of blocks to write (max: EMMC_RPMB_MAX_BLOCKS)
- * @return EMMC_OK on success, error code otherwise
- * 
- * Note: Uses stored key from crypto interface. More efficient than write_data
- * for multiple blocks as it batches operations where possible.
- */
-emmc_result_t emmc_rpmb_write_multi(u16 address, const u8 *data, u16 block_count);
-
-/**
- * @brief Read multiple data blocks from RPMB partition (optimized)
- * @param address Starting block address (0-based)
- * @param data Buffer to store read data (256 bytes per block)
- * @param block_count Number of blocks to read (max: EMMC_RPMB_MAX_BLOCKS)
- * @return EMMC_OK on success, error code otherwise
- * 
- * Note: Uses stored key from crypto interface. Reads all blocks in single
- * transaction for better performance.
- */
-emmc_result_t emmc_rpmb_read_multi(u16 address, u8 *data, u16 block_count);
 
 /* RPMB Constants */
 #define EMMC_RPMB_BLOCK_SIZE        256

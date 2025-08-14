@@ -230,3 +230,239 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter)
     
     return (response_frame.result == EMMC_RPMB_RESULT_OK) ? EMMC_OK : EMMC_ERROR;
 }
+
+/**
+ * @brief Write data to RPMB partition (JESD84-B51 compliant)
+ */
+emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
+{
+    emmc_result_t result;
+    u32 write_counter;
+    u8 nonce[EMMC_RPMB_NONCE_SIZE];
+    
+    if (!g_rpmb_ctx.initialized || !data || block_count == 0 || block_count > EMMC_RPMB_MAX_BLOCKS) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    /* Get current write counter */
+    result = emmc_rpmb_get_write_counter(&write_counter);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Generate nonce for this operation */
+    result = g_rpmb_ctx.crypto.generate_nonce(nonce, EMMC_RPMB_NONCE_SIZE);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Prepare request frames */
+    static emmc_rpmb_frame_t request_frames[EMMC_RPMB_MAX_BLOCKS];
+    
+    for (u16 i = 0; i < block_count; i++) {
+        emmc_rpmb_prepare_frame(&request_frames[i], EMMC_RPMB_WRITE_DATA, 
+                               address + i, block_count, nonce);
+        
+        /* Copy data */
+        memcpy(request_frames[i].data, data + (i * EMMC_RPMB_BLOCK_SIZE), 
+               EMMC_RPMB_BLOCK_SIZE);
+        
+        /* Set write counter (JESD84-B51: same counter for all frames) */
+        request_frames[i].write_counter = write_counter;
+    }
+    
+    /* Calculate HMAC over all frames (JESD84-B51: concatenated data) */
+    void *hmac_ctx = NULL;
+    result = g_rpmb_ctx.crypto.hmac_init(&hmac_ctx, NULL, 0);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Stream HMAC calculation over all frame data */
+    for (u16 i = 0; i < block_count; i++) {
+        /* Add frame data to HMAC */
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, request_frames[i].data, 
+                                              EMMC_RPMB_BLOCK_SIZE);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        /* Add frame metadata to HMAC */
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, request_frames[i].nonce, 
+                                              EMMC_RPMB_NONCE_SIZE);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&request_frames[i].write_counter, 4);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&request_frames[i].address, 2);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&request_frames[i].block_count, 2);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&request_frames[i].result, 2);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&request_frames[i].req_resp, 2);
+        if (result != EMMC_OK) {
+            return result;
+        }
+    }
+    
+    /* Finalize HMAC and place in last frame only (JESD84-B51) */
+    result = g_rpmb_ctx.crypto.hmac_final(hmac_ctx, request_frames[block_count - 1].key_mac, 
+                                         EMMC_RPMB_MAC_SIZE);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Send request frames with reliable write */
+    result = emmc_rpmb_send_request_frames(request_frames, block_count, true);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Get result frame */
+    emmc_rpmb_frame_t response_frame = {0};
+    result = emmc_rpmb_get_response_frames(&response_frame, 1);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Check RPMB result */
+    if (response_frame.result != EMMC_RPMB_RESULT_OK) {
+        return EMMC_ERROR;
+    }
+    
+    return EMMC_OK;
+}
+
+/**
+ * @brief Read data from RPMB partition (JESD84-B51 compliant)
+ */
+emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
+{
+    emmc_result_t result;
+    u8 nonce[EMMC_RPMB_NONCE_SIZE];
+    
+    if (!g_rpmb_ctx.initialized || !data || block_count == 0 || block_count > EMMC_RPMB_MAX_BLOCKS) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    /* Generate nonce for this operation */
+    result = g_rpmb_ctx.crypto.generate_nonce(nonce, EMMC_RPMB_NONCE_SIZE);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Prepare read request frame */
+    emmc_rpmb_frame_t request_frame = {0};
+    emmc_rpmb_prepare_frame(&request_frame, EMMC_RPMB_READ_DATA, 
+                           address, block_count, nonce);
+    
+    /* Send read request */
+    result = emmc_rpmb_send_request_frames(&request_frame, 1, false);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Get response frames */
+    static emmc_rpmb_frame_t response_frames[EMMC_RPMB_MAX_BLOCKS];
+    result = emmc_rpmb_get_response_frames(response_frames, block_count);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Verify nonce in first response frame */
+    if (memcmp(response_frames[0].nonce, nonce, EMMC_RPMB_NONCE_SIZE) != 0) {
+        return EMMC_ERROR;
+    }
+    
+    /* Check RPMB result in first frame */
+    if (response_frames[0].result != EMMC_RPMB_RESULT_OK) {
+        return EMMC_ERROR;
+    }
+    
+    /* Verify MAC using streaming HMAC */
+    void *hmac_ctx = NULL;
+    result = g_rpmb_ctx.crypto.hmac_init(&hmac_ctx, NULL, 0);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Stream HMAC calculation over all response frame data */
+    for (u16 i = 0; i < block_count; i++) {
+        /* Add frame data to HMAC */
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, response_frames[i].data, 
+                                              EMMC_RPMB_BLOCK_SIZE);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        /* Add frame metadata to HMAC */
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, response_frames[i].nonce, 
+                                              EMMC_RPMB_NONCE_SIZE);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&response_frames[i].write_counter, 4);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&response_frames[i].address, 2);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&response_frames[i].block_count, 2);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&response_frames[i].result, 2);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&response_frames[i].req_resp, 2);
+        if (result != EMMC_OK) {
+            return result;
+        }
+    }
+    
+    /* Calculate expected MAC */
+    u8 expected_mac[EMMC_RPMB_MAC_SIZE];
+    result = g_rpmb_ctx.crypto.hmac_final(hmac_ctx, expected_mac, EMMC_RPMB_MAC_SIZE);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Verify MAC from last response frame (JESD84-B51) */
+    result = g_rpmb_ctx.crypto.verify_hmac(NULL, 0, NULL, 0, 
+                                          response_frames[block_count - 1].key_mac, 
+                                          EMMC_RPMB_MAC_SIZE);
+    if (result != EMMC_OK) {
+        return EMMC_ERROR;
+    }
+    
+    /* Copy data to output buffer */
+    for (u16 i = 0; i < block_count; i++) {
+        memcpy(data + (i * EMMC_RPMB_BLOCK_SIZE), response_frames[i].data, 
+               EMMC_RPMB_BLOCK_SIZE);
+    }
+    
+    return EMMC_OK;
+}
