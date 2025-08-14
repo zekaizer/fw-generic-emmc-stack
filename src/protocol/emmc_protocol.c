@@ -697,18 +697,14 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter)
     /* Prepare request frame */
     request_frame.req_resp = EMMC_RPMB_READ_WCOUNTER;
     
-    /* Send write counter read request */
-    result = emmc_send_command_with_data(EMMC_CMD25, 0, EMMC_RESP_R1,
-                                        (u8*)&request_frame, sizeof(emmc_rpmb_frame_t),
-                                        1, false, NULL);
+    /* Send write counter read request (JESD84-B51: 1 frame request) */
+    result = emmc_rpmb_send_request_frames(&request_frame, 1, false);
     if (result != EMMC_OK) {
         return result;
     }
     
-    /* Read response */
-    result = emmc_send_command_with_data(EMMC_CMD18, 0, EMMC_RESP_R1,
-                                        (u8*)&response_frame, sizeof(emmc_rpmb_frame_t),
-                                        1, true, NULL);
+    /* Get response (JESD84-B51: 1 frame response) */
+    result = emmc_rpmb_get_response_frames(&response_frame, 1);
     if (result != EMMC_OK) {
         return result;
     }
@@ -744,16 +740,17 @@ static void emmc_rpmb_prepare_frame(emmc_rpmb_frame_t *frame,
     }
 }
 
+
 /**
- * @brief Send RPMB request and read response
+ * @brief Send RPMB request frames (request transmission only)
  */
-static emmc_result_t emmc_rpmb_send_request(const emmc_rpmb_frame_t *req_frame,
-                                           emmc_rpmb_frame_t *resp_frame,
-                                           u32 frame_count)
+static emmc_result_t emmc_rpmb_send_request_frames(const emmc_rpmb_frame_t *req_frames,
+                                                   u32 frame_count,
+                                                   bool reliable_write)
 {
     emmc_result_t result;
     
-    if (!req_frame || (!resp_frame && frame_count > 0)) {
+    if (!req_frames || frame_count == 0 || frame_count > EMMC_RPMB_MAX_BLOCKS) {
         return EMMC_INVALID_PARAM;
     }
     
@@ -765,37 +762,47 @@ static emmc_result_t emmc_rpmb_send_request(const emmc_rpmb_frame_t *req_frame,
         }
     }
     
-    /* Set block count for reliable write */
-    if (frame_count > 0) {
-        u32 reliable_write_flag = (1U << 31);
-        result = emmc_send_command(EMMC_CMD23, frame_count | reliable_write_flag, 
-                                  EMMC_RESP_R1, NULL);
-        if (result != EMMC_OK) {
-            return result;
-        }
+    /* Set block count with reliable write flag if needed */
+    u32 cmd23_arg = frame_count;
+    if (reliable_write) {
+        cmd23_arg |= (1U << 31);  /* Set reliable write flag */
     }
     
-    /* Send request frame */
-    result = emmc_send_command_with_data(EMMC_CMD25, 0, EMMC_RESP_R1,
-                                        (u8*)req_frame, sizeof(emmc_rpmb_frame_t),
-                                        1, false, NULL);
+    result = emmc_send_command(EMMC_CMD23, cmd23_arg, EMMC_RESP_R1, NULL);
     if (result != EMMC_OK) {
         return result;
     }
     
-    /* Read response if expected */
-    if (resp_frame && frame_count > 0) {
-        /* Set block count for response read */
-        result = emmc_send_command(EMMC_CMD23, frame_count, EMMC_RESP_R1, NULL);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        /* Read response frames */
-        result = emmc_send_command_with_data(EMMC_CMD18, 0, EMMC_RESP_R1,
-                                            (u8*)resp_frame, sizeof(emmc_rpmb_frame_t),
-                                            frame_count, true, NULL);
+    /* Send request frames */
+    result = emmc_send_command_with_data(EMMC_CMD25, 0, EMMC_RESP_R1,
+                                        (u8*)req_frames, sizeof(emmc_rpmb_frame_t),
+                                        frame_count, false, NULL);
+    
+    return result;
+}
+
+/**
+ * @brief Get RPMB response frames (response reception only)
+ */
+static emmc_result_t emmc_rpmb_get_response_frames(emmc_rpmb_frame_t *resp_frames,
+                                                   u32 frame_count)
+{
+    emmc_result_t result;
+    
+    if (!resp_frames || frame_count == 0 || frame_count > EMMC_RPMB_MAX_BLOCKS) {
+        return EMMC_INVALID_PARAM;
     }
+    
+    /* Set block count for response read */
+    result = emmc_send_command(EMMC_CMD23, frame_count, EMMC_RESP_R1, NULL);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Read response frames */
+    result = emmc_send_command_with_data(EMMC_CMD18, 0, EMMC_RESP_R1,
+                                        (u8*)resp_frames, sizeof(emmc_rpmb_frame_t),
+                                        frame_count, true, NULL);
     
     return result;
 }
@@ -910,8 +917,14 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
     /* Prepare read request frame */
     emmc_rpmb_prepare_frame(&read_frame, EMMC_RPMB_READ_DATA, address, block_count, nonce);
     
-    /* Send read request and receive multiple frames */
-    result = emmc_rpmb_send_request(&read_frame, response_frames, block_count);
+    /* Send single read request frame (JESD84-B51: 1 frame request for read) */
+    result = emmc_rpmb_send_request_frames(&read_frame, 1, false);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Get multiple response frames (JESD84-B51: N frames response for read) */
+    result = emmc_rpmb_get_response_frames(response_frames, block_count);
     if (result != EMMC_OK) {
         return result;
     }
@@ -1035,14 +1048,15 @@ static emmc_result_t emmc_rpmb_compute_multi_frame_mac(const emmc_rpmb_frame_t *
         return result;
     }
     
-    /* Update HMAC with each frame data (RPMB spec: concatenated frame order) */
+    /* Update HMAC with concatenated frame data (JESD84-B51 spec: Frame₁_Data || Frame₁_Metadata || Frame₂_Data || Frame₂_Metadata) */
     for (u16 i = 0; i < frame_count; i++) {
         const emmc_rpmb_frame_t *frame = &frames[i];
         
-        /* HMAC input order per RPMB spec: data || nonce || write_counter || address || block_count || result || req_resp */
+        /* First: Add frame data (256 bytes) */
         result = g_protocol_ctx.rpmb_crypto.hmac_update(hmac_ctx, frame->data, 256);
         if (result != EMMC_OK) goto cleanup;
         
+        /* Then: Add frame metadata in spec order */
         result = g_protocol_ctx.rpmb_crypto.hmac_update(hmac_ctx, frame->nonce, 16);
         if (result != EMMC_OK) goto cleanup;
         
@@ -1086,14 +1100,16 @@ static emmc_result_t emmc_rpmb_compute_multi_frame_mac_fallback(const emmc_rpmb_
         return EMMC_INVALID_PARAM;
     }
     
-    /* Concatenate all frame data according to RPMB spec */
+    /* Concatenate all frame data according to JESD84-B51 spec: Frame₁_Data || Frame₁_Metadata || Frame₂_Data || Frame₂_Metadata */
     for (u16 i = 0; i < frame_count; i++) {
         const emmc_rpmb_frame_t *frame = &frames[i];
         u32 offset = total_len;
         
-        /* HMAC input order: data || nonce || write_counter || address || block_count || result || req_resp */
+        /* Frame data first (256 bytes) */
         memcpy(concat_buffer + offset, frame->data, 256);
         offset += 256;
+        
+        /* Then frame metadata in spec order */
         memcpy(concat_buffer + offset, frame->nonce, 16);
         offset += 16;
         memcpy(concat_buffer + offset, &frame->write_counter, 4);
@@ -1125,7 +1141,6 @@ static emmc_result_t emmc_rpmb_write_multi_blocks_optimized(u16 address, const u
 {
     emmc_result_t result;
     static emmc_rpmb_frame_t write_frames[EMMC_RPMB_MAX_BLOCKS];
-    static emmc_rpmb_frame_t result_frames[EMMC_RPMB_MAX_BLOCKS];
     u8 mac[EMMC_RPMB_MAC_SIZE];
     
     if (block_count > EMMC_RPMB_MAX_BLOCKS) {
@@ -1158,36 +1173,39 @@ static emmc_result_t emmc_rpmb_write_multi_blocks_optimized(u16 address, const u
     /* Set MAC only in the last frame (RPMB spec requirement) */
     memcpy(write_frames[block_count - 1].key_mac, mac, EMMC_RPMB_MAC_SIZE);
     
-    /* Send all frames in sequence */
-    for (u16 i = 0; i < block_count; i++) {
-        result = emmc_rpmb_send_request(&write_frames[i], &result_frames[i], 1);
-        if (result != EMMC_OK) {
-            return result;
+    /* Send all frames as single atomic transaction (JESD84-B51 spec requirement) */
+    result = emmc_rpmb_send_request_frames(write_frames, block_count, true);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Get single result frame (JESD84-B51: N frames request → 1 frame response for write) */
+    emmc_rpmb_frame_t result_frame;
+    result = emmc_rpmb_get_response_frames(&result_frame, 1);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Verify result frame for overall operation status */
+    if (result_frame.result != EMMC_RPMB_RESULT_OK) {
+        switch (result_frame.result) {
+            case EMMC_RPMB_RESULT_AUTH_FAILURE:
+                return EMMC_AUTH_ERROR;
+            case EMMC_RPMB_RESULT_COUNTER_FAILURE:
+                return EMMC_COUNTER_ERROR;
+            case EMMC_RPMB_RESULT_ADDRESS_FAILURE:
+                return EMMC_ADDRESS_ERROR;
+            case EMMC_RPMB_RESULT_WRITE_FAILURE:
+                return EMMC_WRITE_ERROR;
+            default:
+                return EMMC_ERROR;
         }
-        
-        /* Check result with specific error handling */
-        if (result_frames[i].result != EMMC_RPMB_RESULT_OK) {
-            switch (result_frames[i].result) {
-                case EMMC_RPMB_RESULT_AUTH_FAILURE:
-                    return EMMC_AUTH_ERROR;
-                case EMMC_RPMB_RESULT_COUNTER_FAILURE:
-                    return EMMC_COUNTER_ERROR;
-                case EMMC_RPMB_RESULT_ADDRESS_FAILURE:
-                    return EMMC_ADDRESS_ERROR;
-                case EMMC_RPMB_RESULT_WRITE_FAILURE:
-                    return EMMC_WRITE_ERROR;
-                default:
-                    return EMMC_ERROR;
-            }
-        }
-        
-        /* Verify write counter incremented correctly (only check once after all frames) */
-        if (i == block_count - 1) {
-            result = emmc_rpmb_verify_write_counter(base_write_counter, result_frames[i].write_counter);
-            if (result != EMMC_OK) {
-                return result;
-            }
-        }
+    }
+    
+    /* Verify write counter incremented correctly (counter + 1 for whole transaction) */
+    result = emmc_rpmb_verify_write_counter(base_write_counter, result_frame.write_counter);
+    if (result != EMMC_OK) {
+        return result;
     }
     
     return EMMC_OK;
