@@ -231,4 +231,8 @@ typedef struct {
     u32 data_size;                      /* Size of user data buffer */
 } emmc_rpmb_batch_context_t;
 
+/* Endian-specific types for RPMB documentation */
+typedef u16 __be16;  /* Big-endian 16-bit */
+typedef u32 __be32;  /* Big-endian 32-bit */
+
 #endif /* EMMC_TYPES_H */

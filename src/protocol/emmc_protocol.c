@@ -308,7 +308,7 @@ emmc_result_t emmc_get_partition_size(emmc_partition_t partition, u64 *size_byte
     return EMMC_OK;
 }
 
-emmc_result_t emmc_optimize_performance(void)
+static emmc_result_t emmc_optimize_performance(void)
 {
     emmc_result_t result = EMMC_OK;
     const emmc_driver_context_t *ctx;

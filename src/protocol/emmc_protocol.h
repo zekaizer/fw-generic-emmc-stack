@@ -106,11 +106,6 @@ emmc_result_t emmc_get_partition_size(emmc_partition_t partition, u64 *size_byte
  */
 const emmc_card_info_t* emmc_get_card_info(void);
 
-/**
- * @brief Optimize bus settings for best performance
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_optimize_performance(void);
 
 /**
  * @brief Set bus width and timing mode

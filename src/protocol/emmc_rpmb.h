@@ -18,11 +18,11 @@ typedef struct {
     u8  key_mac[32];        /* Authentication key or MAC */
     u8  data[256];          /* Data payload */
     u8  nonce[16];          /* Nonce */
-    u32 write_counter;      /* Write counter */
-    u16 address;            /* Block address */
-    u16 block_count;        /* Block count */
-    u16 result;             /* Result code */
-    u16 req_resp;           /* Request/Response type */
+    __be32 write_counter;   /* Write counter (big-endian per JESD84-B51) */
+    __be16 address;         /* Block address (big-endian per JESD84-B51) */
+    __be16 block_count;     /* Block count (big-endian per JESD84-B51) */
+    __be16 result;          /* Result code (big-endian per JESD84-B51) */
+    __be16 req_resp;        /* Request/Response type (big-endian per JESD84-B51) */
 } __attribute__((packed)) emmc_rpmb_frame_t;
 
 /* RPMB external crypto interface */

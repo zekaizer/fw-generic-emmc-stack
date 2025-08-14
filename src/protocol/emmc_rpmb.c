@@ -6,8 +6,8 @@
 /* Forward declarations for protocol layer access */
 extern emmc_result_t emmc_select_partition(emmc_partition_t partition);
 extern emmc_partition_t emmc_get_active_partition(void);
-extern emmc_result_t emmc_send_command(u8 cmd_index, u32 arg, emmc_response_type_t resp_type, u32 *response);
-extern emmc_result_t emmc_send_command_with_data(u8 cmd_index, u32 arg, emmc_response_type_t resp_type,
+extern emmc_result_t emmc_send_command(u8 cmd_index, u32 arg, emmc_resp_type_t resp_type, u32 *response);
+extern emmc_result_t emmc_send_command_with_data(u8 cmd_index, u32 arg, emmc_resp_type_t resp_type,
                                                 u8 *buffer, u32 block_size, u32 block_count, 
                                                 bool read_operation, u32 *response);
 
@@ -18,7 +18,7 @@ static struct {
 } g_rpmb_ctx = {0};
 
 /* Endian conversion utilities for RPMB frame fields (JESD84-B51 big-endian format) */
-static inline u16 be16_to_cpu(u16 val)
+static inline u16 be16_to_cpu(__be16 val)
 {
 #ifdef __LITTLE_ENDIAN__
     return ((val >> 8) & 0xFF) | ((val & 0xFF) << 8);
@@ -27,7 +27,7 @@ static inline u16 be16_to_cpu(u16 val)
 #endif
 }
 
-static inline u32 be32_to_cpu(u32 val)
+static inline u32 be32_to_cpu(__be32 val)
 {
 #ifdef __LITTLE_ENDIAN__
     return ((val >> 24) & 0xFF) | 
@@ -39,7 +39,7 @@ static inline u32 be32_to_cpu(u32 val)
 #endif
 }
 
-static inline u16 cpu_to_be16(u16 val)
+static inline __be16 cpu_to_be16(u16 val)
 {
 #ifdef __LITTLE_ENDIAN__
     return ((val >> 8) & 0xFF) | ((val & 0xFF) << 8);
@@ -48,7 +48,7 @@ static inline u16 cpu_to_be16(u16 val)
 #endif
 }
 
-static inline u32 cpu_to_be32(u32 val)
+static inline __be32 cpu_to_be32(u32 val)
 {
 #ifdef __LITTLE_ENDIAN__
     return ((val >> 24) & 0xFF) | 
