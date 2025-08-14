@@ -147,9 +147,8 @@ emmc_result_t emmc_rpmb_init(const emmc_rpmb_crypto_interface_t *crypto_interfac
         return EMMC_INVALID_PARAM;
     }
     
-    /* Validate all required crypto functions including streaming HMAC */
+    /* Validate all required crypto functions */
     if (!crypto_interface->get_key || !crypto_interface->generate_nonce ||
-        !crypto_interface->compute_hmac || !crypto_interface->verify_hmac ||
         !crypto_interface->hmac_init || !crypto_interface->hmac_update || 
         !crypto_interface->hmac_final) {
         return EMMC_INVALID_PARAM;
@@ -451,10 +450,8 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
     }
     
     /* Verify MAC from last response frame (JESD84-B51) */
-    result = g_rpmb_ctx.crypto.verify_hmac(NULL, 0, NULL, 0, 
-                                          response_frames[block_count - 1].key_mac, 
-                                          EMMC_RPMB_MAC_SIZE);
-    if (result != EMMC_OK) {
+    if (memcmp(expected_mac, response_frames[block_count - 1].key_mac, 
+               EMMC_RPMB_MAC_SIZE) != 0) {
         return EMMC_ERROR;
     }
     

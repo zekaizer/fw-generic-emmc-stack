@@ -33,15 +33,6 @@ typedef struct {
     /* External nonce generation function - generates cryptographically secure random nonce */
     emmc_result_t (*generate_nonce)(u8 *nonce, u32 nonce_len);
     
-    /* External HMAC-SHA256 computation function */
-    emmc_result_t (*compute_hmac)(const u8 *key, u32 key_len,
-                                 const u8 *data, u32 data_len,
-                                 u8 *mac, u32 mac_len);
-    
-    /* External MAC verification function */
-    emmc_result_t (*verify_hmac)(const u8 *key, u32 key_len,
-                                const u8 *data, u32 data_len,
-                                const u8 *expected_mac, u32 mac_len);
     
     /* External streaming HMAC initialization function (REQUIRED for multi-frame operations) */
     emmc_result_t (*hmac_init)(void **ctx, const u8 *key, u32 key_len);
@@ -60,8 +51,8 @@ typedef struct {
  * @param crypto_interface External cryptographic functions (ALL functions REQUIRED)
  * @return EMMC_OK on success, error code otherwise
  * 
- * @note All crypto interface functions are mandatory, including streaming HMAC.
- *       Crypto implementations should handle internal buffering/streaming as needed.
+ * @note Required functions: get_key, generate_nonce, hmac_init, hmac_update, hmac_final.
+ *       All HMAC operations use streaming interface for memory efficiency.
  */
 emmc_result_t emmc_rpmb_init(const emmc_rpmb_crypto_interface_t *crypto_interface);
 
