@@ -3,7 +3,13 @@
 
 #include "../include/emmc_types.h"
 #include "../include/emmc_cmd.h"
-#include "../include/emmc_regs.h"
+
+/* HAL-level reset types (abstracted from hardware registers) */
+typedef enum {
+    HAL_EMMC_RESET_ALL = 0,     /* Reset all controller logic */
+    HAL_EMMC_RESET_CMD = 1,     /* Reset command line only */
+    HAL_EMMC_RESET_DATA = 2     /* Reset data line only */
+} hal_emmc_reset_type_t;
 
 /* HAL initialization and configuration */
 typedef struct {
@@ -47,7 +53,7 @@ emmc_result_t hal_emmc_init(const hal_emmc_config_t *config);
  * @param reset_type Type of reset (all, cmd, data)
  * @return EMMC_OK on success, error code otherwise
  */
-emmc_result_t hal_emmc_reset(u8 reset_type);
+emmc_result_t hal_emmc_reset(hal_emmc_reset_type_t reset_type);
 
 /**
  * @brief Set the eMMC clock frequency
@@ -119,6 +125,27 @@ bool hal_emmc_is_command_ready(void);
  * @return true if transfer active, false otherwise
  */
 bool hal_emmc_is_data_active(void);
+
+/**
+ * @brief Wait for the controller to be ready for commands
+ * @param timeout_ms Timeout in milliseconds
+ * @return EMMC_OK if ready within timeout, EMMC_TIMEOUT otherwise
+ */
+emmc_result_t hal_emmc_wait_cmd_ready(u32 timeout_ms);
+
+/**
+ * @brief Wait for the controller to be ready for data operations
+ * @param timeout_ms Timeout in milliseconds
+ * @return EMMC_OK if ready within timeout, EMMC_TIMEOUT otherwise
+ */
+emmc_result_t hal_emmc_wait_data_ready(u32 timeout_ms);
+
+/**
+ * @brief Wait for both command and data lines to be ready
+ * @param timeout_ms Timeout in milliseconds
+ * @return EMMC_OK if ready within timeout, EMMC_TIMEOUT otherwise
+ */
+emmc_result_t hal_emmc_wait_cmd_data_ready(u32 timeout_ms);
 
 /**
  * @brief Get the current interrupt status
@@ -215,51 +242,6 @@ u8 hal_emmc_read_reg8(u32 offset);
  */
 void hal_emmc_write_reg8(u32 offset, u8 value);
 
-/* Inline helper functions for common register access patterns */
-
-/**
- * @brief Wait for a register bit to become set
- * @param offset Register offset
- * @param mask Bit mask to check
- * @param timeout_ms Timeout in milliseconds
- * @return EMMC_OK if bit set within timeout, EMMC_TIMEOUT otherwise
- */
-static inline emmc_result_t hal_emmc_wait_for_bit_set(u32 offset, u32 mask, u32 timeout_ms)
-{
-    u32 timeout = timeout_ms * 1000;  /* Convert to microseconds */
-    
-    while (timeout > 0) {
-        if (hal_emmc_read_reg(offset) & mask) {
-            return EMMC_OK;
-        }
-        hal_emmc_delay_us(10);
-        timeout -= 10;
-    }
-    
-    return EMMC_TIMEOUT;
-}
-
-/**
- * @brief Wait for a register bit to become clear
- * @param offset Register offset
- * @param mask Bit mask to check
- * @param timeout_ms Timeout in milliseconds
- * @return EMMC_OK if bit cleared within timeout, EMMC_TIMEOUT otherwise
- */
-static inline emmc_result_t hal_emmc_wait_for_bit_clear(u32 offset, u32 mask, u32 timeout_ms)
-{
-    u32 timeout = timeout_ms * 1000;  /* Convert to microseconds */
-    
-    while (timeout > 0) {
-        if (!(hal_emmc_read_reg(offset) & mask)) {
-            return EMMC_OK;
-        }
-        hal_emmc_delay_us(10);
-        timeout -= 10;
-    }
-    
-    return EMMC_TIMEOUT;
-}
 
 /* Hardware-specific constants that may need adjustment per platform */
 #define HAL_EMMC_DEFAULT_TIMEOUT_MS     5000

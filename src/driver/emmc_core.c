@@ -26,7 +26,7 @@ emmc_result_t emmc_driver_init(const emmc_driver_config_t *config)
     }
     
     /* Reset controller */
-    result = hal_emmc_reset(EMMC_RESET_ALL);
+    result = hal_emmc_reset(HAL_EMMC_RESET_ALL);
     if (result != EMMC_OK) {
         return result;
     }
@@ -84,9 +84,7 @@ emmc_result_t emmc_send_command(u8 cmd_index, u32 argument,
     
     /* Wait for controller to be ready */
     if (!hal_emmc_is_command_ready()) {
-        result = hal_emmc_wait_for_bit_clear(EMMC_PRNTS_STATE, 
-                                            EMMC_STATE_CMD_INHIBIT, 
-                                            EMMC_CMD_TIMEOUT_MS);
+        result = hal_emmc_wait_cmd_ready(EMMC_CMD_TIMEOUT_MS);
         if (result != EMMC_OK) {
             return result;
         }
@@ -137,9 +135,7 @@ emmc_result_t emmc_send_command_with_data(u8 cmd_index, u32 argument,
     
     /* Wait for controller to be ready */
     if (!hal_emmc_is_command_ready() || hal_emmc_is_data_active()) {
-        result = hal_emmc_wait_for_bit_clear(EMMC_PRNTS_STATE, 
-                                            EMMC_STATE_CMD_INHIBIT | EMMC_STATE_DATA_INHIBIT,
-                                            EMMC_CMD_TIMEOUT_MS);
+        result = hal_emmc_wait_cmd_data_ready(EMMC_CMD_TIMEOUT_MS);
         if (result != EMMC_OK) {
             return result;
         }

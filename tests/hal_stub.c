@@ -7,6 +7,7 @@
  */
 
 #include "../src/hal/hal_emmc.h"
+#include "emmc_regs.h"
 
 /* Simulated register state */
 static struct {
@@ -50,17 +51,28 @@ emmc_result_t hal_emmc_init(const hal_emmc_config_t *config)
     return EMMC_OK;
 }
 
-emmc_result_t hal_emmc_reset(u8 reset_type)
+emmc_result_t hal_emmc_reset(hal_emmc_reset_type_t reset_type)
 {
     if (!g_hal_state.initialized) {
         return EMMC_NOT_READY;
     }
     
     /* Simulate reset by clearing appropriate state */
-    if (reset_type & EMMC_RESET_ALL) {
-        g_hal_state.present_state = 0;
-        g_hal_state.interrupt_status = 0;
-        g_hal_state.data_index = 0;
+    switch (reset_type) {
+        case HAL_EMMC_RESET_ALL:
+            g_hal_state.present_state = 0;
+            g_hal_state.interrupt_status = 0;
+            g_hal_state.data_index = 0;
+            break;
+        case HAL_EMMC_RESET_CMD:
+            /* Reset command related state only */
+            break;
+        case HAL_EMMC_RESET_DATA:
+            /* Reset data related state only */
+            g_hal_state.data_index = 0;
+            break;
+        default:
+            return EMMC_INVALID_PARAM;
     }
     
     /* Simulate reset completion delay */
@@ -396,4 +408,48 @@ u8 hal_emmc_read_reg8(u32 offset)
 void hal_emmc_write_reg8(u32 offset, u8 value)
 {
     hal_emmc_write_reg(offset, (u32)value);
+}
+
+/* New abstracted HAL functions for command/data readiness */
+
+emmc_result_t hal_emmc_wait_cmd_ready(u32 timeout_ms)
+{
+    if (!g_hal_state.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    /* In stub implementation, always ready if initialized and powered */
+    if (g_hal_state.power_on && g_hal_state.clock_enabled) {
+        return EMMC_OK;
+    }
+    
+    return EMMC_TIMEOUT;
+}
+
+emmc_result_t hal_emmc_wait_data_ready(u32 timeout_ms)
+{
+    if (!g_hal_state.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    /* In stub implementation, always ready if initialized and powered */
+    if (g_hal_state.power_on && g_hal_state.clock_enabled) {
+        return EMMC_OK;
+    }
+    
+    return EMMC_TIMEOUT;
+}
+
+emmc_result_t hal_emmc_wait_cmd_data_ready(u32 timeout_ms)
+{
+    if (!g_hal_state.initialized) {
+        return EMMC_NOT_READY;
+    }
+    
+    /* In stub implementation, always ready if initialized and powered */
+    if (g_hal_state.power_on && g_hal_state.clock_enabled) {
+        return EMMC_OK;
+    }
+    
+    return EMMC_TIMEOUT;
 }
