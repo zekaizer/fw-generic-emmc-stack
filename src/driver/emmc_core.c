@@ -284,10 +284,6 @@ emmc_result_t emmc_card_initialize(void)
         if (result != EMMC_OK) {
             return result;
         }
-    } else {
-        /* Set minimal CSD information */
-        g_emmc_ctx.card_info.csd.sector_size = EMMC_STATIC_SECTOR_SIZE;
-        g_emmc_ctx.card_info.csd.capacity_sectors = 0; /* Will be set from EXT_CSD or defaults */
     }
     
     /* Select card */
@@ -393,43 +389,9 @@ emmc_result_t emmc_parse_csd(const u32 *response, emmc_csd_t *csd)
         return EMMC_INVALID_PARAM;
     }
     
-    /* Parse CSD register fields */
-    csd->csd_structure = (u8)((response[0] >> 30) & 0x3);
-    csd->mmc_prot = (u8)((response[0] >> 26) & 0xF);
-    csd->taac = (u8)((response[0] >> 16) & 0xFF);
-    csd->nsac = (u8)((response[0] >> 8) & 0xFF);
-    csd->tran_speed = (u8)(response[0] & 0xFF);
-    
-    csd->ccc = (u16)((response[1] >> 20) & 0xFFF);
     csd->read_bl_len = (u8)((response[1] >> 16) & 0xF);
-    csd->read_bl_partial = ((response[1] >> 15) & 0x1) != 0;
-    csd->write_blk_misalign = ((response[1] >> 14) & 0x1) != 0;
-    csd->read_blk_misalign = ((response[1] >> 13) & 0x1) != 0;
-    csd->dsr_imp = ((response[1] >> 12) & 0x1) != 0;
-    
     csd->c_size = ((response[1] & 0x3FF) << 2) | ((response[2] >> 30) & 0x3);
-    csd->vdd_r_curr_min = (u8)((response[2] >> 27) & 0x7);
-    csd->vdd_r_curr_max = (u8)((response[2] >> 24) & 0x7);
-    csd->vdd_w_curr_min = (u8)((response[2] >> 21) & 0x7);
-    csd->vdd_w_curr_max = (u8)((response[2] >> 18) & 0x7);
     csd->c_size_mult = (u8)((response[2] >> 15) & 0x7);
-    csd->erase_grp_size = (u8)((response[2] >> 10) & 0x1F);
-    csd->erase_grp_mult = (u8)((response[2] >> 5) & 0x1F);
-    csd->wp_grp_size = (u8)(response[2] & 0x1F);
-    
-    csd->wp_grp_enable = ((response[3] >> 31) & 0x1) != 0;
-    csd->default_ecc = (u8)((response[3] >> 29) & 0x3);
-    csd->r2w_factor = (u8)((response[3] >> 26) & 0x7);
-    csd->write_bl_len = (u8)((response[3] >> 22) & 0xF);
-    csd->write_bl_partial = ((response[3] >> 21) & 0x1) != 0;
-    csd->content_prot_app = ((response[3] >> 16) & 0x1) != 0;
-    csd->file_format_grp = ((response[3] >> 15) & 0x1) != 0;
-    csd->copy = ((response[3] >> 14) & 0x1) != 0;
-    csd->perm_write_protect = ((response[3] >> 13) & 0x1) != 0;
-    csd->tmp_write_protect = ((response[3] >> 12) & 0x1) != 0;
-    csd->file_format = (u8)((response[3] >> 10) & 0x3);
-    csd->ecc = (u8)((response[3] >> 8) & 0x3);
-    csd->crc = (u8)((response[3] >> 1) & 0x7F);
     
     return EMMC_OK;
 }

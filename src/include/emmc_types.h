@@ -99,41 +99,10 @@ typedef struct {
     u8  crc;        /* CRC7 checksum */
 } emmc_cid_t;
 
-/* CSD structure */
 typedef struct {
-    u8  csd_structure;
-    u8  mmc_prot;
-    u8  taac;
-    u8  nsac;
-    u8  tran_speed;
-    u16 ccc;
-    u8  read_bl_len;
-    bool read_bl_partial;
-    bool write_blk_misalign;
-    bool read_blk_misalign;
-    bool dsr_imp;
     u32 c_size;
-    u8  vdd_r_curr_min;
-    u8  vdd_r_curr_max;
-    u8  vdd_w_curr_min;
-    u8  vdd_w_curr_max;
     u8  c_size_mult;
-    u8  erase_grp_size;
-    u8  erase_grp_mult;
-    u8  wp_grp_size;
-    bool wp_grp_enable;
-    u8  default_ecc;
-    u8  r2w_factor;
-    u8  write_bl_len;
-    bool write_bl_partial;
-    bool content_prot_app;
-    bool file_format_grp;
-    bool copy;
-    bool perm_write_protect;
-    bool tmp_write_protect;
-    u8  file_format;
-    u8  ecc;
-    u8  crc;
+    u8  read_bl_len;
 } emmc_csd_t;
 
 typedef struct {
