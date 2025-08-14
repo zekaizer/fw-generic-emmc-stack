@@ -78,13 +78,6 @@ emmc_result_t emmc_write_sectors(u64 start_sector, u32 sector_count, const u8 *b
  */
 emmc_result_t emmc_block_io(const emmc_block_request_t *request);
 
-/**
- * @brief Erase sectors
- * @param start_sector Starting sector number
- * @param sector_count Number of sectors to erase
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_erase_sectors(u64 start_sector, u32 sector_count);
 
 /**
  * @brief Switch to a different partition

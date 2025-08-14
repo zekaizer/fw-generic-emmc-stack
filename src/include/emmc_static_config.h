@@ -79,51 +79,16 @@
 /* Partition Support Static Settings                                        */
 /* ========================================================================= */
 
-/* Disable specific partitions to save code size */
-#ifndef EMMC_DISABLE_BOOT_PARTITION
-    #define EMMC_COMPILE_BOOT_PARTITION  1
-#else
-    #define EMMC_COMPILE_BOOT_PARTITION  0
-#endif
-
-#ifndef EMMC_DISABLE_RPMB
-    #define EMMC_COMPILE_RPMB            1
-#else
-    #define EMMC_COMPILE_RPMB            0
-#endif
-
-#ifndef EMMC_DISABLE_GP_PARTITION
-    #define EMMC_COMPILE_GP_PARTITION    1
-#else
-    #define EMMC_COMPILE_GP_PARTITION    0
-#endif
-
-/* User partition only mode */
-#ifdef EMMC_USER_PARTITION_ONLY
-    #undef  EMMC_COMPILE_BOOT_PARTITION
-    #undef  EMMC_COMPILE_RPMB
-    #undef  EMMC_COMPILE_GP_PARTITION
-    #define EMMC_COMPILE_BOOT_PARTITION  0
-    #define EMMC_COMPILE_RPMB            0
-    #define EMMC_COMPILE_GP_PARTITION    0
-#endif
+/* All partitions are always supported */
+#define EMMC_COMPILE_BOOT_PARTITION  1
+#define EMMC_COMPILE_RPMB            1
+#define EMMC_COMPILE_GP_PARTITION    1
 
 /* ========================================================================= */
 /* Command Set Static Settings                                              */
 /* ========================================================================= */
 
-/* Minimal command set - only basic read/write */
-#ifdef EMMC_MINIMAL_CMD_SET
-    #define EMMC_COMPILE_ERASE_CMD       0
-#else
-    /* Individual command disabling */
-    #ifndef EMMC_DISABLE_ERASE
-        #define EMMC_COMPILE_ERASE_CMD   1
-    #else
-        #define EMMC_COMPILE_ERASE_CMD   0
-    #endif
-
-#endif
+/* Erase commands are not supported */
 
 /* ========================================================================= */
 /* Protocol Feature Static Settings                                         */
@@ -180,13 +145,8 @@
     #define EMMC_COMPILE_CMD23_SUPPORT    1
 #endif
 
-/* Always use single block transfers */
-#ifdef EMMC_SINGLE_BLOCK_ONLY
-    #define EMMC_COMPILE_MULTI_BLOCK      0
-    #define EMMC_COMPILE_CMD23_SUPPORT    0
-#else
-    #define EMMC_COMPILE_MULTI_BLOCK      1
-#endif
+/* Always use multi-block transfers */
+#define EMMC_COMPILE_MULTI_BLOCK      1
 
 /* ========================================================================= */
 /* Error Handling Static Settings                                          */
@@ -246,11 +206,5 @@
     #endif
 #endif
 
-/* Validate single block configuration */
-#ifdef EMMC_SINGLE_BLOCK_ONLY
-    #if EMMC_COMPILE_CMD23_SUPPORT
-        #error "Single block only mode disables CMD23 support"
-    #endif
-#endif
 
 #endif /* EMMC_STATIC_CONFIG_H */

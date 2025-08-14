@@ -24,16 +24,10 @@
     #define EMMC_STATIC_BUS_MODE         EMMC_MODE_SDR
     #define EMMC_STATIC_BUS_WIDTH        1
     
-    /* Partition support: User partition only */
-    #define EMMC_USER_PARTITION_ONLY
-    #define EMMC_DISABLE_BOOT_PARTITION
-    #define EMMC_DISABLE_RPMB
-    #define EMMC_DISABLE_GP_PARTITION
+    /* Partition support: All partitions supported */
     
     /* Command set: Basic read/write only */
     #define EMMC_MINIMAL_CMD_SET
-    #define EMMC_DISABLE_ERASE
-    #define EMMC_SINGLE_BLOCK_ONLY
     #define EMMC_DISABLE_CMD23
     
     /* Protocol simplification */
@@ -59,14 +53,11 @@
     #define EMMC_STATIC_BUS_MODE         EMMC_MODE_HS400_ES
     #define EMMC_STATIC_BUS_WIDTH        8
     
-    /* Partition support: User and Boot partitions */
-    #define EMMC_DISABLE_RPMB            /* No security features */
-    #define EMMC_DISABLE_GP_PARTITION    /* No general purpose partitions */
+    /* Partition support: All partitions supported */
     
     /* Command set: Basic operations + boot support */
     
     /* Keep essential features */
-    /* EMMC_COMPILE_ERASE_CMD = 1 (enabled) */
     /* EMMC_COMPILE_CMD23_SUPPORT = 1 (enabled) */
     
     /* Protocol features: Keep card identification */
@@ -91,10 +82,10 @@
     #define EMMC_STATIC_BUS_MODE         EMMC_MODE_HS200
     #define EMMC_STATIC_BUS_WIDTH        8
     
-    /* Partition support: User, Boot, and RPMB */
-    #define EMMC_DISABLE_GP_PARTITION    /* No general purpose partitions */
+    /* Partition support: All partitions supported */
     /* EMMC_COMPILE_RPMB = 1 (enabled) */
     /* EMMC_COMPILE_BOOT_PARTITION = 1 (enabled) */
+    /* EMMC_COMPILE_GP_PARTITION = 1 (enabled) */
     
     /* Command set: Basic commands only */
     #define EMMC_DISABLE_SLEEP           /* No power management */
@@ -125,7 +116,7 @@
     #define EMMC_STATIC_BUS_MODE         EMMC_MODE_HS400_ES
     #define EMMC_STATIC_BUS_WIDTH        8
     
-    /* Partition support: All partitions */
+    /* Partition support: All partitions supported */
     /* EMMC_COMPILE_BOOT_PARTITION = 1 (enabled) */
     /* EMMC_COMPILE_RPMB = 1 (enabled) */
     /* EMMC_COMPILE_GP_PARTITION = 1 (enabled) */
@@ -156,15 +147,14 @@
     #define EMMC_STATIC_BUS_MODE         EMMC_MODE_HS200
     #define EMMC_STATIC_BUS_WIDTH        8
     
-    /* Partition support: Boot partition focused */
+    /* Partition support: All partitions supported */
     /* EMMC_COMPILE_BOOT_PARTITION = 1 (enabled) */
-    #define EMMC_DISABLE_RPMB            /* No security in bootloader */
-    #define EMMC_DISABLE_GP_PARTITION
+    /* EMMC_COMPILE_RPMB = 1 (enabled) */
+    /* EMMC_COMPILE_GP_PARTITION = 1 (enabled) */
     
     /* Command set: Basic + boot commands */
     
-    /* Keep erase for emergency recovery */
-    /* EMMC_COMPILE_ERASE_CMD = 1 (enabled) */
+    /* Keep essential features for emergency recovery */
     /* EMMC_COMPILE_CMD23_SUPPORT = 1 (enabled) */
     
     /* Protocol features: Minimal parsing */
@@ -189,13 +179,12 @@
     #define EMMC_STATIC_BUS_MODE         EMMC_MODE_HS200
     #define EMMC_STATIC_BUS_WIDTH        8
     
-    /* Partition support: All partitions for recovery operations */
+    /* Partition support: All partitions supported */
     /* EMMC_COMPILE_BOOT_PARTITION = 1 (enabled) */
-    /* EMMC_COMPILE_RPMB = 1 (for secure updates) */
-    /* EMMC_COMPILE_GP_PARTITION = 1 (for recovery data) */
+    /* EMMC_COMPILE_RPMB = 1 (enabled) */
+    /* EMMC_COMPILE_GP_PARTITION = 1 (enabled) */
     
-    /* Command set: Include erase for recovery */
-    /* EMMC_COMPILE_ERASE_CMD = 1 (enabled) */
+    /* Command set: Basic commands for recovery */
     #define EMMC_DISABLE_BKOPS           /* No background ops during recovery */
     
     /* Keep advanced transfers */
