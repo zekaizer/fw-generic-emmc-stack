@@ -90,7 +90,7 @@ The firmware implements a layered architecture:
 
 ## RPMB Specification Compliance
 
-**CRITICAL**: All RPMB implementations MUST strictly follow JESD84-B51 specification.
+**CRITICAL**: All RPMB implementations MUST strictly follow JESD84-B51 specification and reference docs/rpmb-protocol.md for complete implementation guidance.
 
 ### Core RPMB Protocol Requirements
 
@@ -126,7 +126,7 @@ Where each Frame_Metadata includes:
 
 ### Mandatory Implementation Rules
 
-1. **Always validate against JESD84-B51**: Before implementing ANY RPMB feature, reference section 6.6.22
+1. **Always validate against JESD84-B51**: Before implementing ANY RPMB feature, reference section 6.6.22 and docs/rpmb-protocol.md
 2. **Write Counter Management**:
    - Single request = Single write counter value for ALL frames
    - Counter increments ONLY after successful multi-frame write completion
@@ -164,7 +164,7 @@ Where each Frame_Metadata includes:
 ### Code Review Checklist
 
 Before committing any RPMB code changes:
-- [ ] Verified against JESD84-B51 specification section 6.6.22
+- [ ] Verified against JESD84-B51 specification section 6.6.22 and docs/rpmb-protocol.md
 - [ ] Multi-block writes use single counter value
 - [ ] HMAC calculated over concatenated frame data
 - [ ] MAC placed only in last frame
@@ -240,7 +240,7 @@ Before committing any RPMB code changes:
 
 ### Production Readiness Checklist
 
-- [ ] All JESD84-B51 requirements implemented
+- [ ] All JESD84-B51 requirements implemented per docs/rpmb-protocol.md
 - [ ] Zero dynamic memory allocation
 - [ ] Interrupt-safe operation confirmed
 - [ ] Error recovery mechanisms tested
