@@ -109,6 +109,32 @@ static emmc_result_t emmc_rpmb_get_response_frames(emmc_rpmb_frame_t *resp_frame
 }
 
 /**
+ * @brief Map RPMB result codes to emmc_result_t (JESD84-B51 Section 6.6.22)
+ */
+static emmc_result_t emmc_rpmb_map_result_code(u16 rpmb_result)
+{
+    switch (rpmb_result) {
+        case EMMC_RPMB_RESULT_OK:
+            return EMMC_OK;
+        case EMMC_RPMB_RESULT_GENERAL_FAILURE:
+            return EMMC_ERROR;
+        case EMMC_RPMB_RESULT_AUTH_FAILURE:
+            return EMMC_MAC_ERROR;
+        case EMMC_RPMB_RESULT_COUNTER_FAILURE:
+            return EMMC_COUNTER_ERROR;
+        case EMMC_RPMB_RESULT_ADDRESS_FAILURE:
+            return EMMC_ADDRESS_ERROR;
+        case EMMC_RPMB_RESULT_WRITE_FAILURE:
+        case EMMC_RPMB_RESULT_READ_FAILURE:
+            return EMMC_ERROR;
+        case EMMC_RPMB_RESULT_KEY_NOT_PROGRAMMED:
+            return EMMC_AUTH_ERROR;
+        default:
+            return EMMC_ERROR;
+    }
+}
+
+/**
  * @brief Verify write counter increment
  */
 static emmc_result_t emmc_rpmb_verify_write_counter(u32 expected_counter, u32 actual_counter)
@@ -119,6 +145,22 @@ static emmc_result_t emmc_rpmb_verify_write_counter(u32 expected_counter, u32 ac
     }
     
     return EMMC_OK;
+}
+
+/**
+ * @brief Constant-time memory comparison to prevent timing attacks
+ */
+static int emmc_rpmb_constant_time_memcmp(const u8 *a, const u8 *b, size_t len)
+{
+    u8 result = 0;
+    
+    /* Always compare all bytes regardless of differences found */
+    for (size_t i = 0; i < len; i++) {
+        result |= a[i] ^ b[i];
+    }
+    
+    /* Return 0 if equal, non-zero if different */
+    return result;
 }
 
 /**
@@ -227,7 +269,7 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter)
     /* Extract write counter */
     *counter = response_frame.write_counter;
     
-    return (response_frame.result == EMMC_RPMB_RESULT_OK) ? EMMC_OK : EMMC_ERROR;
+    return emmc_rpmb_map_result_code(response_frame.result);
 }
 
 /**
@@ -340,8 +382,15 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
     }
     
     /* Check RPMB result */
-    if (response_frame.result != EMMC_RPMB_RESULT_OK) {
-        return EMMC_ERROR;
+    result = emmc_rpmb_map_result_code(response_frame.result);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Verify write counter incremented correctly (JESD84-B51) */
+    result = emmc_rpmb_verify_write_counter(write_counter, response_frame.write_counter);
+    if (result != EMMC_OK) {
+        return result;
     }
     
     return EMMC_OK;
@@ -384,13 +433,14 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
     }
     
     /* Verify nonce in first response frame */
-    if (memcmp(response_frames[0].nonce, nonce, EMMC_RPMB_NONCE_SIZE) != 0) {
+    if (emmc_rpmb_constant_time_memcmp(response_frames[0].nonce, nonce, EMMC_RPMB_NONCE_SIZE) != 0) {
         return EMMC_ERROR;
     }
     
     /* Check RPMB result in first frame */
-    if (response_frames[0].result != EMMC_RPMB_RESULT_OK) {
-        return EMMC_ERROR;
+    result = emmc_rpmb_map_result_code(response_frames[0].result);
+    if (result != EMMC_OK) {
+        return result;
     }
     
     /* Verify MAC using streaming HMAC */
@@ -450,7 +500,7 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
     }
     
     /* Verify MAC from last response frame (JESD84-B51) */
-    if (memcmp(expected_mac, response_frames[block_count - 1].key_mac, 
+    if (emmc_rpmb_constant_time_memcmp(expected_mac, response_frames[block_count - 1].key_mac, 
                EMMC_RPMB_MAC_SIZE) != 0) {
         return EMMC_ERROR;
     }

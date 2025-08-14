@@ -50,11 +50,16 @@ static emmc_result_t mock_generate_nonce(u8 *nonce, u32 nonce_len)
     return EMMC_OK;
 }
 
-static emmc_result_t mock_compute_hmac(const u8 *key, u32 key_len,
-                                      const u8 *data, u32 data_len,
-                                      u8 *mac, u32 mac_len)
+/* Mock streaming HMAC context */
+typedef struct {
+    u32 hash;
+    u32 data_len;
+    bool initialized;
+} mock_hmac_ctx_t;
+
+static emmc_result_t mock_hmac_init(void **ctx, const u8 *key, u32 key_len)
 {
-    if (!key || !data || !mac || key_len != 32 || mac_len != 32) {
+    if (!ctx) {
         return EMMC_INVALID_PARAM;
     }
     
@@ -63,42 +68,65 @@ static emmc_result_t mock_compute_hmac(const u8 *key, u32 key_len,
         return EMMC_ERROR;
     }
     
-    /* Simple mock HMAC - XOR key with data hash */
-    /* In real implementation, this would be proper HMAC-SHA256 */
-    u32 hash = 0x5A5A5A5A; /* Mock hash */
-    for (u32 i = 0; i < data_len; i++) {
-        hash ^= data[i];
-        hash = (hash << 1) | (hash >> 31); /* Rotate left */
-    }
+    /* Allocate mock context (static allocation for testing) */
+    static mock_hmac_ctx_t mock_ctx;
+    mock_ctx.hash = 0x5A5A5A5A; /* Initial hash value */
+    mock_ctx.data_len = 0;
+    mock_ctx.initialized = true;
     
-    for (u32 i = 0; i < mac_len; i++) {
-        mac[i] = g_mock_rpmb_key[i] ^ ((u8)(hash >> (i % 4)));
-    }
+    *ctx = &mock_ctx;
     
-    printf("Mock: HMAC computed (hash: 0x%08X)\n", hash);
+    printf("Mock: HMAC init successful\n");
     return EMMC_OK;
 }
 
-static emmc_result_t mock_verify_hmac(const u8 *key, u32 key_len,
-                                     const u8 *data, u32 data_len,
-                                     const u8 *expected_mac, u32 mac_len)
+static emmc_result_t mock_hmac_update(void *ctx, const u8 *data, u32 data_len)
 {
-    u8 computed_mac[32];
-    emmc_result_t result;
-    
-    /* Compute MAC */
-    result = mock_compute_hmac(key, key_len, data, data_len, computed_mac, mac_len);
-    if (result != EMMC_OK) {
-        return result;
+    if (!ctx || !data) {
+        return EMMC_INVALID_PARAM;
     }
     
-    /* Compare MACs */
-    if (memcmp(computed_mac, expected_mac, mac_len) != 0) {
-        printf("Mock: HMAC verification failed\n");
+    mock_hmac_ctx_t *hmac_ctx = (mock_hmac_ctx_t *)ctx;
+    
+    if (!hmac_ctx->initialized) {
         return EMMC_ERROR;
     }
     
-    printf("Mock: HMAC verification successful\n");
+    /* Update hash with new data */
+    for (u32 i = 0; i < data_len; i++) {
+        hmac_ctx->hash ^= data[i];
+        hmac_ctx->hash = (hmac_ctx->hash << 1) | (hmac_ctx->hash >> 31); /* Rotate left */
+    }
+    
+    hmac_ctx->data_len += data_len;
+    
+    printf("Mock: HMAC update (%u bytes)\n", data_len);
+    return EMMC_OK;
+}
+
+static emmc_result_t mock_hmac_final(void *ctx, u8 *mac, u32 mac_len)
+{
+    if (!ctx || !mac || mac_len != 32) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    mock_hmac_ctx_t *hmac_ctx = (mock_hmac_ctx_t *)ctx;
+    
+    if (!hmac_ctx->initialized) {
+        return EMMC_ERROR;
+    }
+    
+    /* Generate final MAC by XORing with key */
+    for (u32 i = 0; i < mac_len; i++) {
+        mac[i] = g_mock_rpmb_key[i] ^ ((u8)(hmac_ctx->hash >> (i % 4)));
+    }
+    
+    printf("Mock: HMAC final (hash: 0x%08X, %u bytes processed)\n", 
+           hmac_ctx->hash, hmac_ctx->data_len);
+    
+    /* Reset context */
+    hmac_ctx->initialized = false;
+    
     return EMMC_OK;
 }
 
@@ -106,8 +134,9 @@ static emmc_result_t mock_verify_hmac(const u8 *key, u32 key_len,
 static emmc_rpmb_crypto_interface_t mock_crypto_interface = {
     .get_key = mock_get_key,
     .generate_nonce = mock_generate_nonce,
-    .compute_hmac = mock_compute_hmac,
-    .verify_hmac = mock_verify_hmac
+    .hmac_init = mock_hmac_init,
+    .hmac_update = mock_hmac_update,
+    .hmac_final = mock_hmac_final
 };
 
 /* Helper function to inject key for testing */
@@ -283,14 +312,17 @@ static void test_rpmb_read_data(void)
     printf("Test 5 PASSED\n");
 }
 
-/* Test 6: Crypto Interface Functions */
+/* Test 6: Streaming HMAC Interface Functions */
 static void test_crypto_interface(void)
 {
     emmc_result_t result;
     u8 mac[32];
-    u8 test_payload[] = "Hello RPMB World!";
+    u8 test_payload1[] = "Hello ";
+    u8 test_payload2[] = "RPMB ";
+    u8 test_payload3[] = "World!";
+    void *hmac_ctx = NULL;
     
-    printf("\n=== Test 6: Crypto Interface Functions ===\n");
+    printf("\n=== Test 6: Streaming HMAC Interface Functions ===\n");
     
     /* Reset and inject key */
     g_key_injected = false;
@@ -298,21 +330,31 @@ static void test_crypto_interface(void)
     assert(result == EMMC_OK);
     printf("✓ Key injection successful\n");
     
-    /* Test HMAC computation */
-    result = mock_compute_hmac(test_key, 32, test_payload, sizeof(test_payload), mac, 32);
+    /* Test streaming HMAC computation */
+    result = mock_hmac_init(&hmac_ctx, test_key, 32);
     assert(result == EMMC_OK);
-    printf("✓ HMAC computation successful\n");
+    printf("✓ HMAC init successful\n");
     
-    /* Test HMAC verification with correct MAC */
-    result = mock_verify_hmac(test_key, 32, test_payload, sizeof(test_payload), mac, 32);
+    result = mock_hmac_update(hmac_ctx, test_payload1, sizeof(test_payload1) - 1);
     assert(result == EMMC_OK);
-    printf("✓ HMAC verification successful\n");
+    printf("✓ HMAC update 1 successful\n");
     
-    /* Test HMAC verification with wrong MAC */
-    mac[0] ^= 0xFF; /* Corrupt MAC */
-    result = mock_verify_hmac(test_key, 32, test_payload, sizeof(test_payload), mac, 32);
-    assert(result == EMMC_ERROR);
-    printf("✓ HMAC verification correctly failed with corrupted MAC\n");
+    result = mock_hmac_update(hmac_ctx, test_payload2, sizeof(test_payload2) - 1);
+    assert(result == EMMC_OK);
+    printf("✓ HMAC update 2 successful\n");
+    
+    result = mock_hmac_update(hmac_ctx, test_payload3, sizeof(test_payload3) - 1);
+    assert(result == EMMC_OK);
+    printf("✓ HMAC update 3 successful\n");
+    
+    result = mock_hmac_final(hmac_ctx, mac, 32);
+    assert(result == EMMC_OK);
+    printf("✓ HMAC final successful\n");
+    
+    /* Test invalid parameters */
+    result = mock_hmac_init(NULL, test_key, 32);
+    assert(result == EMMC_INVALID_PARAM);
+    printf("✓ HMAC init correctly rejected NULL context pointer\n");
     
     printf("Test 6 PASSED\n");
 }
@@ -336,14 +378,16 @@ static void test_error_handling(void)
     /* Test with invalid key lengths in crypto functions */
     u8 short_key[16] = {0};
     u8 mac[32];
+    void *hmac_ctx = NULL;
     
     result = mock_inject_key_for_test(short_key, 16);
     assert(result == EMMC_INVALID_PARAM);
     printf("✓ Short key rejected\n");
     
-    result = mock_compute_hmac(short_key, 16, test_data, 256, mac, 32);
+    /* Test HMAC with invalid parameters */
+    result = mock_hmac_final(NULL, mac, 32);
     assert(result == EMMC_INVALID_PARAM);
-    printf("✓ Short key in HMAC rejected\n");
+    printf("✓ HMAC final correctly rejected NULL context\n");
     
     printf("Test 7 PASSED\n");
 }
