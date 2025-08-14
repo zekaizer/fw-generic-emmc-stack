@@ -5,43 +5,43 @@
 
 /* RPMB operation types */
 typedef enum {
-    EMMC_RPMB_WRITE_KEY     = 0x01,
-    EMMC_RPMB_READ_WCOUNTER = 0x02,
-    EMMC_RPMB_WRITE_DATA    = 0x03,
-    EMMC_RPMB_READ_DATA     = 0x04,
-    EMMC_RPMB_READ_RESULT   = 0x05
+	EMMC_RPMB_WRITE_KEY	 = 0x01,
+	EMMC_RPMB_READ_WCOUNTER = 0x02,
+	EMMC_RPMB_WRITE_DATA	= 0x03,
+	EMMC_RPMB_READ_DATA	 = 0x04,
+	EMMC_RPMB_READ_RESULT	 = 0x05
 } emmc_rpmb_op_type_t;
 
 /* RPMB request/response structure */
 typedef struct {
-    u8  stuff[196];         /* Stuff bytes */
-    u8  key_mac[32];        /* Authentication key or MAC */
-    u8  data[256];          /* Data payload */
-    u8  nonce[16];          /* Nonce */
-    __be32 write_counter;   /* Write counter (big-endian per JESD84-B51) */
-    __be16 address;         /* Block address (big-endian per JESD84-B51) */
-    __be16 block_count;     /* Block count (big-endian per JESD84-B51) */
-    __be16 result;          /* Result code (big-endian per JESD84-B51) */
-    __be16 req_resp;        /* Request/Response type (big-endian per JESD84-B51) */
+	u8	stuff[196];		 /* Stuff bytes */
+	u8	key_mac[32];		/* Authentication key or MAC */
+	u8	data[256];			/* Data payload */
+	u8	nonce[16];			/* Nonce */
+	__be32 write_counter;	 /* Write counter (big-endian per JESD84-B51) */
+	__be16 address;		 /* Block address (big-endian per JESD84-B51) */
+	__be16 block_count;	 /* Block count (big-endian per JESD84-B51) */
+	__be16 result;			/* Result code (big-endian per JESD84-B51) */
+	__be16 req_resp;		/* Request/Response type (big-endian per JESD84-B51) */
 } __attribute__((packed)) emmc_rpmb_frame_t;
 
 /* RPMB external crypto interface */
 typedef struct {
-    /* External key retrieval function - gets currently active RPMB key */
-    emmc_result_t (*get_key)(u8 *key, u32 key_len);
-    
-    /* External nonce generation function - generates cryptographically secure random nonce */
-    emmc_result_t (*generate_nonce)(u8 *nonce, u32 nonce_len);
-    
-    
-    /* External streaming HMAC initialization function (REQUIRED for multi-frame operations) */
-    emmc_result_t (*hmac_init)(void **ctx, const u8 *key, u32 key_len);
-    
-    /* External streaming HMAC update function (REQUIRED for multi-frame operations) */
-    emmc_result_t (*hmac_update)(void *ctx, const u8 *data, u32 data_len);
-    
-    /* External streaming HMAC finalization function (REQUIRED for multi-frame operations) */
-    emmc_result_t (*hmac_final)(void *ctx, u8 *mac, u32 mac_len);
+	/* External key retrieval function - gets currently active RPMB key */
+	emmc_result_t (*get_key)(u8 *key, u32 key_len);
+
+	/* External nonce generation function - generates cryptographically secure random nonce */
+	emmc_result_t (*generate_nonce)(u8 *nonce, u32 nonce_len);
+
+
+	/* External streaming HMAC initialization function (REQUIRED for multi-frame operations) */
+	emmc_result_t (*hmac_init)(void **ctx, const u8 *key, u32 key_len);
+
+	/* External streaming HMAC update function (REQUIRED for multi-frame operations) */
+	emmc_result_t (*hmac_update)(void *ctx, const u8 *data, u32 data_len);
+
+	/* External streaming HMAC finalization function (REQUIRED for multi-frame operations) */
+	emmc_result_t (*hmac_final)(void *ctx, u8 *mac, u32 mac_len);
 } emmc_rpmb_crypto_interface_t;
 
 /* RPMB Functions */
@@ -50,9 +50,9 @@ typedef struct {
  * @brief Initialize RPMB with external crypto interface
  * @param crypto_interface External cryptographic functions (ALL functions REQUIRED)
  * @return EMMC_OK on success, error code otherwise
- * 
+ *
  * @note Required functions: get_key, generate_nonce, hmac_init, hmac_update, hmac_final.
- *       All HMAC operations use streaming interface for memory efficiency.
+ *		 All HMAC operations use streaming interface for memory efficiency.
  */
 emmc_result_t emmc_rpmb_init(const emmc_rpmb_crypto_interface_t *crypto_interface);
 
@@ -76,7 +76,7 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter);
  * @param data Data to write (256 bytes per block)
  * @param block_count Number of blocks to write (max: EMMC_RPMB_MAX_BLOCKS)
  * @return EMMC_OK on success, error code otherwise
- * 
+ *
  * Note: Uses key from crypto interface. Optimized for both single and multi-block
  * operations. Batches operations and uses streaming HMAC for efficiency.
  */
@@ -88,7 +88,7 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
  * @param data Buffer to store read data (256 bytes per block)
  * @param block_count Number of blocks to read (max: EMMC_RPMB_MAX_BLOCKS)
  * @return EMMC_OK on success, error code otherwise
- * 
+ *
  * Note: Uses key from crypto interface. Optimized for both single and multi-block
  * operations. Reads all blocks in single transaction for best performance.
  */
@@ -96,22 +96,22 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count);
 
 
 /* RPMB Constants */
-#define EMMC_RPMB_BLOCK_SIZE        256
-#define EMMC_RPMB_KEY_SIZE          32
-#define EMMC_RPMB_METADATA_SIZE     28   /* Size of metadata from nonce to req_resp (16+4+2+2+2+2) */
-#define EMMC_RPMB_HMAC_DATA_SIZE    284  /* Size of data+metadata for HMAC (256+28) */
-#define EMMC_RPMB_MAC_SIZE          32
-#define EMMC_RPMB_NONCE_SIZE        16
-#define EMMC_RPMB_MAX_BLOCKS        32     /* Maximum blocks per RPMB transaction */
+#define EMMC_RPMB_BLOCK_SIZE		256
+#define EMMC_RPMB_KEY_SIZE			32
+#define EMMC_RPMB_METADATA_SIZE	 28	 /* Size of metadata from nonce to req_resp (16+4+2+2+2+2) */
+#define EMMC_RPMB_HMAC_DATA_SIZE	284	/* Size of data+metadata for HMAC (256+28) */
+#define EMMC_RPMB_MAC_SIZE			32
+#define EMMC_RPMB_NONCE_SIZE		16
+#define EMMC_RPMB_MAX_BLOCKS		32	 /* Maximum blocks per RPMB transaction */
 
 /* RPMB result codes */
-#define EMMC_RPMB_RESULT_OK                 0x0000
-#define EMMC_RPMB_RESULT_GENERAL_FAILURE    0x0001
-#define EMMC_RPMB_RESULT_AUTH_FAILURE       0x0002
-#define EMMC_RPMB_RESULT_COUNTER_FAILURE    0x0003
-#define EMMC_RPMB_RESULT_ADDRESS_FAILURE    0x0004
-#define EMMC_RPMB_RESULT_WRITE_FAILURE      0x0005
-#define EMMC_RPMB_RESULT_READ_FAILURE       0x0006
+#define EMMC_RPMB_RESULT_OK				 0x0000
+#define EMMC_RPMB_RESULT_GENERAL_FAILURE	0x0001
+#define EMMC_RPMB_RESULT_AUTH_FAILURE		 0x0002
+#define EMMC_RPMB_RESULT_COUNTER_FAILURE	0x0003
+#define EMMC_RPMB_RESULT_ADDRESS_FAILURE	0x0004
+#define EMMC_RPMB_RESULT_WRITE_FAILURE		0x0005
+#define EMMC_RPMB_RESULT_READ_FAILURE		 0x0006
 #define EMMC_RPMB_RESULT_KEY_NOT_PROGRAMMED 0x0007
 
 #endif /* EMMC_RPMB_H */

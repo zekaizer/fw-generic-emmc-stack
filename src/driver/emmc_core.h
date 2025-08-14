@@ -7,20 +7,20 @@
 
 /* eMMC driver initialization parameters */
 typedef struct {
-    hal_emmc_config_t hal_config;   /* HAL configuration */
-    u32 init_timeout_ms;            /* Initialization timeout */
-    bool enable_cache;              /* Enable card cache */
-    bool enable_bkops;              /* Enable background operations */
+	hal_emmc_config_t hal_config;	 /* HAL configuration */
+	u32 init_timeout_ms;			/* Initialization timeout */
+	bool enable_cache;				/* Enable card cache */
+	bool enable_bkops;				/* Enable background operations */
 } emmc_driver_config_t;
 
 /* eMMC driver context */
 typedef struct {
-    emmc_card_info_t    card_info;      /* Card information */
-    hal_emmc_config_t   hal_config;     /* HAL configuration */
-    emmc_driver_config_t driver_config; /* Driver configuration */
-    bool                initialized;    /* Driver initialization status */
-    u32                 current_clock;  /* Current clock frequency */
-    emmc_partition_t    active_part;    /* Currently active partition */
+	emmc_card_info_t	card_info;		/* Card information */
+	hal_emmc_config_t	 hal_config;	 /* HAL configuration */
+	emmc_driver_config_t driver_config; /* Driver configuration */
+	bool				initialized;	/* Driver initialization status */
+	u32				 current_clock;	/* Current clock frequency */
+	emmc_partition_t	active_part;	/* Currently active partition */
 } emmc_driver_context_t;
 
 /* Driver function prototypes */
@@ -58,8 +58,8 @@ emmc_result_t emmc_card_initialize(void);
  * @param response Buffer for response (can be NULL for no response)
  * @return EMMC_OK on success, error code otherwise
  */
-emmc_result_t emmc_send_command(u8 cmd_index, u32 argument, 
-                               emmc_resp_type_t resp_type, u32 *response);
+emmc_result_t emmc_send_command(u8 cmd_index, u32 argument,
+								 emmc_resp_type_t resp_type, u32 *response);
 
 /**
  * @brief Send a command with data transfer
@@ -74,10 +74,10 @@ emmc_result_t emmc_send_command(u8 cmd_index, u32 argument,
  * @return EMMC_OK on success, error code otherwise
  */
 emmc_result_t emmc_send_command_with_data(u8 cmd_index, u32 argument,
-                                         emmc_resp_type_t resp_type,
-                                         u8 *buffer, u32 block_size, 
-                                         u32 block_count, bool read_operation,
-                                         u32 *response);
+										 emmc_resp_type_t resp_type,
+										 u8 *buffer, u32 block_size,
+										 u32 block_count, bool read_operation,
+										 u32 *response);
 
 /**
  * @brief Get card status
@@ -201,17 +201,17 @@ emmc_result_t emmc_wait_for_state(emmc_state_t target_state, u32 timeout_ms);
 
 
 /* Helper macros */
-#define EMMC_BLOCK_SIZE         512
-#define EMMC_MAX_BLOCK_COUNT    65535
+#define EMMC_BLOCK_SIZE		 512
+#define EMMC_MAX_BLOCK_COUNT	65535
 
 /* Default timeouts */
-#define EMMC_CMD_TIMEOUT_MS     5000
-#define EMMC_DATA_TIMEOUT_MS    10000
-#define EMMC_INIT_TIMEOUT_MS    1000
-#define EMMC_SWITCH_TIMEOUT_MS  500
+#define EMMC_CMD_TIMEOUT_MS	 5000
+#define EMMC_DATA_TIMEOUT_MS	10000
+#define EMMC_INIT_TIMEOUT_MS	1000
+#define EMMC_SWITCH_TIMEOUT_MS	500
 
 /* Card state extraction from status */
 #define EMMC_GET_CARD_STATE(status) \
-    ((emmc_state_t)(((status) & EMMC_R1_STATE_MASK) >> EMMC_R1_STATE_SHIFT))
+	((emmc_state_t)(((status) & EMMC_R1_STATE_MASK) >> EMMC_R1_STATE_SHIFT))
 
 #endif /* EMMC_CORE_H */

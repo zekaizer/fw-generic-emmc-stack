@@ -9,18 +9,18 @@
 
 /* Protocol layer initialization configuration */
 typedef struct {
-    emmc_driver_config_t driver_config; /* Driver configuration */
-    bool auto_optimize;                  /* Automatically optimize bus settings */
-    bool enable_advanced_features;      /* Enable HS200/HS400, cache, etc. */
+	emmc_driver_config_t driver_config; /* Driver configuration */
+	bool auto_optimize;					/* Automatically optimize bus settings */
+	bool enable_advanced_features;		/* Enable HS200/HS400, cache, etc. */
 } emmc_protocol_config_t;
 
 /* Block I/O request structure */
 typedef struct {
-    u64  start_sector;      /* Starting sector number */
-    u32  sector_count;      /* Number of sectors to transfer */
-    u8   *buffer;          /* Data buffer */
-    bool read_operation;   /* true for read, false for write */
-    bool reliable_write;   /* Use reliable write (if supported) */
+	u64	start_sector;		/* Starting sector number */
+	u32	sector_count;		/* Number of sectors to transfer */
+	u8	 *buffer;			/* Data buffer */
+	bool read_operation;	 /* true for read, false for write */
+	bool reliable_write;	 /* Use reliable write (if supported) */
 } emmc_block_request_t;
 
 
@@ -136,7 +136,7 @@ emmc_result_t emmc_get_bus_config(emmc_bus_width_t *width, emmc_bus_mode_t *mode
  */
 static inline u32 emmc_sector_to_lba(u64 sector_num)
 {
-    return (u32)(sector_num & 0xFFFFFFFF);
+	return (u32)(sector_num & 0xFFFFFFFF);
 }
 
 /**
@@ -146,7 +146,7 @@ static inline u32 emmc_sector_to_lba(u64 sector_num)
  */
 static inline bool emmc_needs_extended_lba(u64 sector_num)
 {
-    return sector_num > 0xFFFFFFFF;
+	return sector_num > 0xFFFFFFFF;
 }
 
 /**
@@ -156,10 +156,10 @@ static inline bool emmc_needs_extended_lba(u64 sector_num)
 u32 emmc_get_optimal_transfer_size(void);
 
 /* Constants */
-#define EMMC_SECTOR_SIZE            512
+#define EMMC_SECTOR_SIZE			512
 
 /* Maximum transfer sizes */
-#define EMMC_MAX_SINGLE_TRANSFER    65536   /* sectors */
-#define EMMC_MAX_MULTI_TRANSFER     65535   /* sectors */
+#define EMMC_MAX_SINGLE_TRANSFER	65536	 /* sectors */
+#define EMMC_MAX_MULTI_TRANSFER	 65535	 /* sectors */
 
 #endif /* EMMC_PROTOCOL_H */

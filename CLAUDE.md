@@ -24,10 +24,40 @@ This is a generic eMMC stack firmware project designed for bare-metal environmen
 
 ## Memory Optimization Guidelines
 
+### Code Formatting Standards
+- **Indentation**: Use tabs only, no spaces for indentation
+- **Line Endings**: Remove all trailing whitespace from lines
+- **Consistency**: Maintain uniform formatting across all source files
+
+### Compile-Time Memory Optimization
 - **Conditional Compilation**: Use `if (STATIC_MACRO)` instead of `#if` for dead code elimination
 - **Constant Propagation**: Leverage compiler optimization for static configuration
 - **Zero Runtime Cost**: Static configurations should have zero runtime overhead
 - **Memory Footprint**: Minimize binary size through compile-time optimization
+
+### Runtime Memory Management
+- **Static Buffer Allocation**: Pre-allocate all buffers at compile time
+- **Stack Usage Optimization**: Minimize local variable stack consumption
+- **Global State Management**: Use singleton pattern for driver contexts
+- **Buffer Reuse**: Reuse static buffers across different operations when safe
+
+### Memory Layout Optimization
+- **Structure Packing**: Align structures to minimize padding overhead
+- **Const Data Placement**: Place read-only data in flash memory sections
+- **Volatile Access Patterns**: Use volatile only when necessary for hardware registers
+- **Cache Line Alignment**: Align DMA buffers to cache line boundaries (32/64 bytes)
+
+### Memory Safety Guidelines
+- **Bounds Checking**: Always validate array access boundaries
+- **Null Pointer Checks**: Validate all pointer parameters before use
+- **Buffer Overflow Prevention**: Use safe string functions and size limits
+- **Stack Overflow Protection**: Monitor stack usage in recursive functions
+
+### Embedded-Specific Optimizations
+- **Flash Memory Conservation**: Minimize string literals and debug output
+- **SRAM Usage**: Prioritize SRAM for frequently accessed data
+- **DMA Buffer Management**: Use statically allocated, aligned buffers for DMA
+- **Interrupt Context Safety**: Ensure interrupt-safe memory access patterns
 
 ## Project Structure
 
