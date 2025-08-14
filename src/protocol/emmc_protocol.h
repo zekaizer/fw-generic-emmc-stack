@@ -59,6 +59,15 @@ typedef struct {
     emmc_result_t (*verify_hmac)(const u8 *key, u32 key_len,
                                 const u8 *data, u32 data_len,
                                 const u8 *expected_mac, u32 mac_len);
+    
+    /* External streaming HMAC initialization function for multi-frame operations */
+    emmc_result_t (*hmac_init)(void **ctx, const u8 *key, u32 key_len);
+    
+    /* External streaming HMAC update function for multi-frame operations */
+    emmc_result_t (*hmac_update)(void *ctx, const u8 *data, u32 data_len);
+    
+    /* External streaming HMAC finalization function for multi-frame operations */
+    emmc_result_t (*hmac_final)(void *ctx, u8 *mac, u32 mac_len);
 } emmc_rpmb_crypto_interface_t;
 
 /* Protocol layer function prototypes */

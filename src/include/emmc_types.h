@@ -76,7 +76,16 @@ typedef enum {
     EMMC_BUSY           = -4,
     EMMC_NOT_READY      = -5,
     EMMC_INVALID_PARAM  = -6,
-    EMMC_NOT_SUPPORTED  = -7
+    EMMC_NOT_SUPPORTED  = -7,
+    /* RPMB-specific error codes */
+    EMMC_AUTH_ERROR     = -8,
+    EMMC_COUNTER_ERROR  = -9,
+    EMMC_ADDRESS_ERROR  = -10,
+    EMMC_READ_ERROR     = -11,
+    EMMC_WRITE_ERROR    = -12,
+    EMMC_PROTOCOL_ERROR = -13,
+    EMMC_NONCE_ERROR    = -14,
+    EMMC_MAC_ERROR      = -15
 } emmc_result_t;
 
 /* CID structure */

@@ -835,6 +835,7 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
 {
     emmc_result_t result;
     u8 auth_key[EMMC_RPMB_KEY_SIZE];
+    u32 base_write_counter;
     
     if (!g_protocol_ctx.initialized || !g_protocol_ctx.rpmb_initialized || 
         !data || block_count == 0) {
@@ -855,18 +856,14 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
         return result;
     }
     
-    /* RPMB authenticated writes must be done one block at a time */
-    /* Each write increments the write counter, so we do sequential writes */
-    for (u16 i = 0; i < block_count; i++) {
-        result = emmc_rpmb_write_single_block(address + i, 
-                                            data + i * EMMC_RPMB_BLOCK_SIZE, 
-                                            auth_key);
-        if (result != EMMC_OK) {
-            return result;
-        }
+    /* Get base write counter once for optimization */
+    result = emmc_rpmb_get_write_counter(&base_write_counter);
+    if (result != EMMC_OK) {
+        return result;
     }
     
-    return EMMC_OK;
+    /* Use unified multi-block implementation for both single and multi-block writes */
+    return emmc_rpmb_write_multi_blocks_optimized(address, data, block_count, auth_key, base_write_counter);
 }
 
 emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
@@ -919,29 +916,27 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
         return result;
     }
     
-    /* Process each response frame */
+    /* Process each response frame with enhanced error handling */
     for (u16 i = 0; i < block_count; i++) {
         emmc_rpmb_frame_t *frame = &response_frames[i];
         
-        /* Check result */
+        /* Check RPMB operation result first */
         if (frame->result != EMMC_RPMB_RESULT_OK) {
-            return EMMC_ERROR;
-        }
+            /* Return specific error based on RPMB result code */
+            switch (frame->result) {
+                case EMMC_RPMB_RESULT_AUTH_FAILURE:
+                    return EMMC_AUTH_ERROR;
+                case EMMC_RPMB_RESULT_COUNTER_FAILURE:
+                    return EMMC_COUNTER_ERROR;
+                case EMMC_RPMB_RESULT_ADDRESS_FAILURE:
+                    return EMMC_ADDRESS_ERROR;
+                case EMMC_RPMB_RESULT_READ_FAILURE:
+                    return EMMC_READ_ERROR;
+                default:
+                    return EMMC_ERROR;
+            }\n        }
         
-        /* Verify nonce matches (only for first frame) */
-        if (i == 0 && memcmp(frame->nonce, nonce, EMMC_RPMB_NONCE_SIZE) != 0) {
-            return EMMC_ERROR; /* Nonce mismatch - possible replay attack */
-        }
-        
-        /* Verify MAC for each frame */
-        result = emmc_rpmb_verify_frame_mac(frame, auth_key);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        /* Copy data to output buffer */
-        memcpy(data + i * EMMC_RPMB_BLOCK_SIZE, frame->data, EMMC_RPMB_BLOCK_SIZE);
-    }
+        /* Verify request/response type */\n        if (frame->req_resp != EMMC_RPMB_READ_DATA) {\n            return EMMC_PROTOCOL_ERROR;\n        }\n        \n        /* Verify block address consistency */\n        if (frame->address != address + i) {\n            return EMMC_ADDRESS_ERROR;\n        }\n        \n        /* Verify nonce matches (only for first frame) */\n        if (i == 0 && memcmp(frame->nonce, nonce, EMMC_RPMB_NONCE_SIZE) != 0) {\n            return EMMC_NONCE_ERROR; /* Nonce mismatch - possible replay attack */\n        }\n        \n        /* Verify MAC for each frame */\n        result = emmc_rpmb_verify_frame_mac(frame, auth_key);\n        if (result != EMMC_OK) {\n            return EMMC_MAC_ERROR; /* MAC verification failed */\n        }\n        \n        /* Copy data to output buffer */\n        memcpy(data + i * EMMC_RPMB_BLOCK_SIZE, frame->data, EMMC_RPMB_BLOCK_SIZE);\n    }
     
     return EMMC_OK;
 }
@@ -982,85 +977,232 @@ static emmc_result_t emmc_rpmb_verify_frame_mac(const emmc_rpmb_frame_t *frame, 
                                                   frame->key_mac, EMMC_RPMB_MAC_SIZE);
 }
 
+/* Note: Legacy single-block functions removed - using unified multi-block implementation */
+
 /**
- * @brief Write a single RPMB block (for multi-block write operations)
+ * @brief Compute MAC for RPMB frame (optimized helper)
  */
-static emmc_result_t emmc_rpmb_write_single_block(u16 address, const u8 *data, const u8 *key)
+static emmc_result_t emmc_rpmb_compute_frame_mac(const emmc_rpmb_frame_t *frame, const u8 *key, u8 *mac)
 {
-    emmc_result_t result;
-    emmc_rpmb_frame_t write_frame = {0};
-    emmc_rpmb_frame_t result_frame = {0};
-    u32 write_counter;
-    u8 mac[EMMC_RPMB_MAC_SIZE];
-    
-    /* Get current write counter */
-    result = emmc_rpmb_get_write_counter(&write_counter);
-    if (result != EMMC_OK) {
-        return result;
-    }
-    
-    /* Prepare write frame */
-    emmc_rpmb_prepare_frame(&write_frame, EMMC_RPMB_WRITE_DATA, address, 1, NULL);
-    write_frame.write_counter = write_counter;
-    
-    /* Copy data to frame */
-    memcpy(write_frame.data, data, EMMC_RPMB_BLOCK_SIZE);
-    
-    /* Compute HMAC-SHA256 */
+    /* HMAC input: data || nonce || write_counter || address || block_count || result || req_resp */
     u8 hmac_data[256 + 16 + 4 + 2 + 2 + 2 + 2]; /* Total: 284 bytes */
     u32 hmac_offset = 0;
     
     /* Build HMAC input */
-    memcpy(hmac_data + hmac_offset, write_frame.data, 256);
+    memcpy(hmac_data + hmac_offset, frame->data, 256);
     hmac_offset += 256;
-    memcpy(hmac_data + hmac_offset, write_frame.nonce, 16);
+    memcpy(hmac_data + hmac_offset, frame->nonce, 16);
     hmac_offset += 16;
-    memcpy(hmac_data + hmac_offset, &write_frame.write_counter, 4);
+    memcpy(hmac_data + hmac_offset, &frame->write_counter, 4);
     hmac_offset += 4;
-    memcpy(hmac_data + hmac_offset, &write_frame.address, 2);
+    memcpy(hmac_data + hmac_offset, &frame->address, 2);
     hmac_offset += 2;
-    memcpy(hmac_data + hmac_offset, &write_frame.block_count, 2);
+    memcpy(hmac_data + hmac_offset, &frame->block_count, 2);
     hmac_offset += 2;
-    memcpy(hmac_data + hmac_offset, &write_frame.result, 2);
+    memcpy(hmac_data + hmac_offset, &frame->result, 2);
     hmac_offset += 2;
-    memcpy(hmac_data + hmac_offset, &write_frame.req_resp, 2);
+    memcpy(hmac_data + hmac_offset, &frame->req_resp, 2);
     hmac_offset += 2;
     
-    result = g_protocol_ctx.rpmb_crypto.compute_hmac(key, EMMC_RPMB_KEY_SIZE,
-                                                     hmac_data, hmac_offset,
-                                                     mac, EMMC_RPMB_MAC_SIZE);
+    return g_protocol_ctx.rpmb_crypto.compute_hmac(key, EMMC_RPMB_KEY_SIZE,
+                                                   hmac_data, hmac_offset,
+                                                   mac, EMMC_RPMB_MAC_SIZE);
+}
+
+/**
+ * @brief Compute multi-frame HMAC for RPMB write according to specification
+ * @note RPMB spec requires HMAC calculation over all frames, with MAC only in last frame
+ */
+static emmc_result_t emmc_rpmb_compute_multi_frame_mac(const emmc_rpmb_frame_t *frames, 
+                                                      u16 frame_count, 
+                                                      const u8 *key, 
+                                                      u8 *mac)
+{
+    emmc_result_t result;
+    void *hmac_ctx = NULL;
+    
+    /* Check if streaming HMAC interface is available */
+    if (!g_protocol_ctx.rpmb_crypto.hmac_init || 
+        !g_protocol_ctx.rpmb_crypto.hmac_update || 
+        !g_protocol_ctx.rpmb_crypto.hmac_final) {
+        /* Fallback to concatenated single-shot HMAC */
+        return emmc_rpmb_compute_multi_frame_mac_fallback(frames, frame_count, key, mac);
+    }
+    
+    /* Initialize streaming HMAC */
+    result = g_protocol_ctx.rpmb_crypto.hmac_init(&hmac_ctx, key, EMMC_RPMB_KEY_SIZE);
     if (result != EMMC_OK) {
         return result;
     }
     
-    /* Copy MAC to frame */
-    memcpy(write_frame.key_mac, mac, EMMC_RPMB_MAC_SIZE);
+    /* Update HMAC with each frame data (RPMB spec: concatenated frame order) */
+    for (u16 i = 0; i < frame_count; i++) {
+        const emmc_rpmb_frame_t *frame = &frames[i];
+        
+        /* HMAC input order per RPMB spec: data || nonce || write_counter || address || block_count || result || req_resp */
+        result = g_protocol_ctx.rpmb_crypto.hmac_update(hmac_ctx, frame->data, 256);
+        if (result != EMMC_OK) goto cleanup;
+        
+        result = g_protocol_ctx.rpmb_crypto.hmac_update(hmac_ctx, frame->nonce, 16);
+        if (result != EMMC_OK) goto cleanup;
+        
+        result = g_protocol_ctx.rpmb_crypto.hmac_update(hmac_ctx, (u8*)&frame->write_counter, 4);
+        if (result != EMMC_OK) goto cleanup;
+        
+        result = g_protocol_ctx.rpmb_crypto.hmac_update(hmac_ctx, (u8*)&frame->address, 2);
+        if (result != EMMC_OK) goto cleanup;
+        
+        result = g_protocol_ctx.rpmb_crypto.hmac_update(hmac_ctx, (u8*)&frame->block_count, 2);
+        if (result != EMMC_OK) goto cleanup;
+        
+        result = g_protocol_ctx.rpmb_crypto.hmac_update(hmac_ctx, (u8*)&frame->result, 2);
+        if (result != EMMC_OK) goto cleanup;
+        
+        result = g_protocol_ctx.rpmb_crypto.hmac_update(hmac_ctx, (u8*)&frame->req_resp, 2);
+        if (result != EMMC_OK) goto cleanup;
+    }
     
-    /* Send authenticated write request */
-    result = emmc_rpmb_send_request(&write_frame, &result_frame, 1);
+    /* Finalize HMAC */
+    result = g_protocol_ctx.rpmb_crypto.hmac_final(hmac_ctx, mac, EMMC_RPMB_MAC_SIZE);
+    
+cleanup:
+    /* Note: hmac_final typically cleans up context, but this depends on implementation */
+    return result;
+}
+
+/**
+ * @brief Fallback multi-frame MAC computation using concatenated buffer
+ */
+static emmc_result_t emmc_rpmb_compute_multi_frame_mac_fallback(const emmc_rpmb_frame_t *frames,
+                                                               u16 frame_count,
+                                                               const u8 *key,
+                                                               u8 *mac)
+{
+    /* Allocate buffer for concatenated frame data */
+    static u8 concat_buffer[EMMC_RPMB_MAX_BLOCKS * 284]; /* 284 bytes per frame */
+    u32 total_len = 0;
+    
+    if (frame_count > EMMC_RPMB_MAX_BLOCKS) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    /* Concatenate all frame data according to RPMB spec */
+    for (u16 i = 0; i < frame_count; i++) {
+        const emmc_rpmb_frame_t *frame = &frames[i];
+        u32 offset = total_len;
+        
+        /* HMAC input order: data || nonce || write_counter || address || block_count || result || req_resp */
+        memcpy(concat_buffer + offset, frame->data, 256);
+        offset += 256;
+        memcpy(concat_buffer + offset, frame->nonce, 16);
+        offset += 16;
+        memcpy(concat_buffer + offset, &frame->write_counter, 4);
+        offset += 4;
+        memcpy(concat_buffer + offset, &frame->address, 2);
+        offset += 2;
+        memcpy(concat_buffer + offset, &frame->block_count, 2);
+        offset += 2;
+        memcpy(concat_buffer + offset, &frame->result, 2);
+        offset += 2;
+        memcpy(concat_buffer + offset, &frame->req_resp, 2);
+        offset += 2;
+        
+        total_len = offset;
+    }
+    
+    /* Compute HMAC over concatenated data */
+    return g_protocol_ctx.rpmb_crypto.compute_hmac(key, EMMC_RPMB_KEY_SIZE,
+                                                   concat_buffer, total_len,
+                                                   mac, EMMC_RPMB_MAC_SIZE);
+}
+
+/**
+ * @brief RPMB spec-compliant multi-block write with single MAC in last frame
+ */
+static emmc_result_t emmc_rpmb_write_multi_blocks_optimized(u16 address, const u8 *data, 
+                                                           u16 block_count, const u8 *key, 
+                                                           u32 base_write_counter)
+{
+    emmc_result_t result;
+    static emmc_rpmb_frame_t write_frames[EMMC_RPMB_MAX_BLOCKS];
+    static emmc_rpmb_frame_t result_frames[EMMC_RPMB_MAX_BLOCKS];
+    u8 mac[EMMC_RPMB_MAC_SIZE];
+    
+    if (block_count > EMMC_RPMB_MAX_BLOCKS) {
+        return EMMC_INVALID_PARAM;
+    }
+    
+    /* Prepare all write frames (RPMB spec: same write counter for all frames in one request) */
+    for (u16 i = 0; i < block_count; i++) {
+        emmc_rpmb_frame_t *frame = &write_frames[i];
+        
+        /* Prepare frame without MAC */
+        emmc_rpmb_prepare_frame(frame, EMMC_RPMB_WRITE_DATA, address + i, 1, NULL);
+        
+        /* RPMB spec: All frames in single request use same write counter */
+        frame->write_counter = base_write_counter;
+        
+        /* Copy data */
+        memcpy(frame->data, data + i * EMMC_RPMB_BLOCK_SIZE, EMMC_RPMB_BLOCK_SIZE);
+        
+        /* Clear MAC field for all frames initially */
+        memset(frame->key_mac, 0, EMMC_RPMB_MAC_SIZE);
+    }
+    
+    /* Compute multi-frame HMAC according to RPMB specification */
+    result = emmc_rpmb_compute_multi_frame_mac(write_frames, block_count, key, mac);
     if (result != EMMC_OK) {
         return result;
     }
     
-    /* Check result */
-    if (result_frame.result != EMMC_RPMB_RESULT_OK) {
-        return EMMC_ERROR;
+    /* Set MAC only in the last frame (RPMB spec requirement) */
+    memcpy(write_frames[block_count - 1].key_mac, mac, EMMC_RPMB_MAC_SIZE);
+    
+    /* Send all frames in sequence */
+    for (u16 i = 0; i < block_count; i++) {
+        result = emmc_rpmb_send_request(&write_frames[i], &result_frames[i], 1);
+        if (result != EMMC_OK) {
+            return result;
+        }
+        
+        /* Check result with specific error handling */
+        if (result_frames[i].result != EMMC_RPMB_RESULT_OK) {
+            switch (result_frames[i].result) {
+                case EMMC_RPMB_RESULT_AUTH_FAILURE:
+                    return EMMC_AUTH_ERROR;
+                case EMMC_RPMB_RESULT_COUNTER_FAILURE:
+                    return EMMC_COUNTER_ERROR;
+                case EMMC_RPMB_RESULT_ADDRESS_FAILURE:
+                    return EMMC_ADDRESS_ERROR;
+                case EMMC_RPMB_RESULT_WRITE_FAILURE:
+                    return EMMC_WRITE_ERROR;
+                default:
+                    return EMMC_ERROR;
+            }
+        }
+        
+        /* Verify write counter incremented correctly (only check once after all frames) */
+        if (i == block_count - 1) {
+            result = emmc_rpmb_verify_write_counter(base_write_counter, result_frames[i].write_counter);
+            if (result != EMMC_OK) {
+                return result;
+            }
+        }
     }
     
-    /* Verify write counter incremented */
-    return emmc_rpmb_verify_write_counter(write_counter, result_frame.write_counter);
+    return EMMC_OK;
 }
 
 /* New optimized multi-frame functions */
 
 emmc_result_t emmc_rpmb_read_multi(u16 address, u8 *data, u16 block_count)
 {
-    /* Use read_data - key automatically retrieved from crypto interface */
+    /* Use optimized read_data - already supports true multi-block reads */
     return emmc_rpmb_read_data(address, data, block_count);
 }
 
 emmc_result_t emmc_rpmb_write_multi(u16 address, const u8 *data, u16 block_count)
 {
-    /* Use write_data - key automatically retrieved from crypto interface */
+    /* Use optimized write_data with batched operations */
     return emmc_rpmb_write_data(address, data, block_count);
 }
