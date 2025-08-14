@@ -17,6 +17,49 @@ static struct {
     bool initialized;
 } g_rpmb_ctx = {0};
 
+/* Endian conversion utilities for RPMB frame fields (JESD84-B51 big-endian format) */
+static inline u16 be16_to_cpu(u16 val)
+{
+#ifdef __LITTLE_ENDIAN__
+    return ((val >> 8) & 0xFF) | ((val & 0xFF) << 8);
+#else
+    return val;
+#endif
+}
+
+static inline u32 be32_to_cpu(u32 val)
+{
+#ifdef __LITTLE_ENDIAN__
+    return ((val >> 24) & 0xFF) | 
+           ((val >> 8) & 0xFF00) | 
+           ((val & 0xFF00) << 8) | 
+           ((val & 0xFF) << 24);
+#else
+    return val;
+#endif
+}
+
+static inline u16 cpu_to_be16(u16 val)
+{
+#ifdef __LITTLE_ENDIAN__
+    return ((val >> 8) & 0xFF) | ((val & 0xFF) << 8);
+#else
+    return val;
+#endif
+}
+
+static inline u32 cpu_to_be32(u32 val)
+{
+#ifdef __LITTLE_ENDIAN__
+    return ((val >> 24) & 0xFF) | 
+           ((val >> 8) & 0xFF00) | 
+           ((val & 0xFF00) << 8) | 
+           ((val & 0xFF) << 24);
+#else
+    return val;
+#endif
+}
+
 /* RPMB Helper Functions */
 
 /**
@@ -31,10 +74,10 @@ static void emmc_rpmb_prepare_frame(emmc_rpmb_frame_t *frame,
     /* Clear frame */
     memset(frame, 0, sizeof(emmc_rpmb_frame_t));
     
-    /* Set common fields */
-    frame->req_resp = req_resp;
-    frame->address = address;
-    frame->block_count = block_count;
+    /* Set common fields in big-endian format (JESD84-B51) */
+    frame->req_resp = cpu_to_be16(req_resp);
+    frame->address = cpu_to_be16(address);
+    frame->block_count = cpu_to_be16(block_count);
     
     /* Copy nonce if provided */
     if (nonce) {
@@ -218,7 +261,7 @@ emmc_result_t emmc_rpmb_program_key(const u8 *key)
     }
     
     /* Prepare RPMB frame for key programming */
-    frame.req_resp = EMMC_RPMB_WRITE_KEY;
+    frame.req_resp = cpu_to_be16(EMMC_RPMB_WRITE_KEY);
     
     /* Copy key to frame */
     for (int i = 0; i < EMMC_RPMB_KEY_SIZE; i++) {
@@ -252,7 +295,7 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter)
     }
     
     /* Prepare request frame */
-    request_frame.req_resp = EMMC_RPMB_READ_WCOUNTER;
+    request_frame.req_resp = cpu_to_be16(EMMC_RPMB_READ_WCOUNTER);
     
     /* Send write counter read request (JESD84-B51: 1 frame request) */
     result = emmc_rpmb_send_request_frames(&request_frame, 1, false);
@@ -266,10 +309,10 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter)
         return result;
     }
     
-    /* Extract write counter */
-    *counter = response_frame.write_counter;
+    /* Extract write counter from big-endian format */
+    *counter = be32_to_cpu(response_frame.write_counter);
     
-    return emmc_rpmb_map_result_code(response_frame.result);
+    return emmc_rpmb_map_result_code(be16_to_cpu(response_frame.result));
 }
 
 /**
@@ -308,8 +351,8 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
         memcpy(request_frames[i].data, data + (i * EMMC_RPMB_BLOCK_SIZE), 
                EMMC_RPMB_BLOCK_SIZE);
         
-        /* Set write counter (JESD84-B51: same counter for all frames) */
-        request_frames[i].write_counter = write_counter;
+        /* Set write counter in big-endian format (JESD84-B51: same counter for all frames) */
+        request_frames[i].write_counter = cpu_to_be32(write_counter);
     }
     
     /* Calculate HMAC over all frames (JESD84-B51: concatenated data) */
@@ -319,43 +362,11 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
         return result;
     }
     
-    /* Stream HMAC calculation over all frame data */
+    /* Stream HMAC calculation over all frame data (optimized: data+metadata as single block) */
     for (u16 i = 0; i < block_count; i++) {
-        /* Add frame data to HMAC */
+        /* Add frame data+metadata to HMAC as contiguous block (JESD84-B51 big-endian format) */
         result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, request_frames[i].data, 
-                                              EMMC_RPMB_BLOCK_SIZE);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        /* Add frame metadata to HMAC */
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, request_frames[i].nonce, 
-                                              EMMC_RPMB_NONCE_SIZE);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&request_frames[i].write_counter, 4);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&request_frames[i].address, 2);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&request_frames[i].block_count, 2);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&request_frames[i].result, 2);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&request_frames[i].req_resp, 2);
+                                              EMMC_RPMB_HMAC_DATA_SIZE);
         if (result != EMMC_OK) {
             return result;
         }
@@ -382,13 +393,13 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
     }
     
     /* Check RPMB result */
-    result = emmc_rpmb_map_result_code(response_frame.result);
+    result = emmc_rpmb_map_result_code(be16_to_cpu(response_frame.result));
     if (result != EMMC_OK) {
         return result;
     }
     
     /* Verify write counter incremented correctly (JESD84-B51) */
-    result = emmc_rpmb_verify_write_counter(write_counter, response_frame.write_counter);
+    result = emmc_rpmb_verify_write_counter(write_counter, be32_to_cpu(response_frame.write_counter));
     if (result != EMMC_OK) {
         return result;
     }
@@ -438,7 +449,7 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
     }
     
     /* Check RPMB result in first frame */
-    result = emmc_rpmb_map_result_code(response_frames[0].result);
+    result = emmc_rpmb_map_result_code(be16_to_cpu(response_frames[0].result));
     if (result != EMMC_OK) {
         return result;
     }
@@ -450,43 +461,11 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
         return result;
     }
     
-    /* Stream HMAC calculation over all response frame data */
+    /* Stream HMAC calculation over all response frame data (optimized: data+metadata as single block) */
     for (u16 i = 0; i < block_count; i++) {
-        /* Add frame data to HMAC */
+        /* Add frame data+metadata to HMAC as contiguous block (JESD84-B51 big-endian format) */
         result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, response_frames[i].data, 
-                                              EMMC_RPMB_BLOCK_SIZE);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        /* Add frame metadata to HMAC */
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, response_frames[i].nonce, 
-                                              EMMC_RPMB_NONCE_SIZE);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&response_frames[i].write_counter, 4);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&response_frames[i].address, 2);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&response_frames[i].block_count, 2);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&response_frames[i].result, 2);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, (u8*)&response_frames[i].req_resp, 2);
+                                              EMMC_RPMB_HMAC_DATA_SIZE);
         if (result != EMMC_OK) {
             return result;
         }

@@ -125,18 +125,33 @@ RPMB protocol defines 5 distinct frame types identified by the `req_resp` field:
 RPMB frames are exactly 512 bytes with the following structure:
 
 ```
-Offset  Size  Field         Description
-------  ----  -----------   ----------------------------------
-0       196   stuff         Padding bytes (must be 0x00)
-196     32    key_mac       Authentication key or MAC
-228     256   data          Data payload (256 bytes)
-484     16    nonce         Random nonce for replay protection
-500     4     write_counter Write counter value
-504     2     address       Block address (0-based)
-506     2     block_count   Number of blocks
-508     2     result        Result/error code
-510     2     req_resp      Request/response type
+Offset  Size  Field         Description                            Endian
+------  ----  -----------   ------------------------------------   ------
+0       196   stuff         Padding bytes (must be 0x00)          N/A
+196     32    key_mac       Authentication key or MAC              N/A
+228     256   data          Data payload (256 bytes)               N/A
+484     16    nonce         Random nonce for replay protection     N/A
+500     4     write_counter Write counter value                    Big-endian
+504     2     address       Block address (0-based)                Big-endian
+506     2     block_count   Number of blocks                       Big-endian
+508     2     result        Result/error code                      Big-endian
+510     2     req_resp      Request/response type                  Big-endian
 ```
+
+### Endian Requirements (JESD84-B51 Section 6.6.22)
+
+**All multi-byte numeric fields in RPMB frames MUST be stored in big-endian format:**
+
+- `write_counter` (4 bytes): Big-endian format as per eMMC specification
+- `address` (2 bytes): Big-endian format for block addressing
+- `block_count` (2 bytes): Big-endian format for operation size
+- `result` (2 bytes): Big-endian format for error codes
+- `req_resp` (2 bytes): Big-endian format for operation type
+
+**Protocol Requirements:**
+- All multi-byte fields transmitted in big-endian byte order
+- HMAC computation performed on big-endian frame data as transmitted
+- Host implementations must handle endian conversion as appropriate for target platform
 
 ## Security Requirements
 
