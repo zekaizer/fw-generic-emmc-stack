@@ -62,8 +62,6 @@ src/
 ├── protocol/
 │   ├── emmc_protocol.h     # Core protocol interface
 │   ├── emmc_protocol.c     # Core protocol implementation
-│   ├── emmc_features.h     # Advanced features (auto-linked)
-│   └── emmc_advanced.c     # Advanced features implementation
 └── include/
     ├── emmc_types.h        # Common data types
     ├── emmc_cmd.h          # Command definitions

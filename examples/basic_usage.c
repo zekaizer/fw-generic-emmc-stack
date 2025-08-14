@@ -177,11 +177,6 @@ emmc_result_t example_performance_test(void)
         /* Continue even if this fails - not all platforms support 8-bit */
     }
     
-    /* Enable cache if not already enabled */
-    result = emmc_set_cache_enable(true);
-    if (result != EMMC_OK) {
-        /* Cache might not be supported - continue */
-    }
     
     /* Test large transfer performance */
     u32 large_sector_count = emmc_get_optimal_transfer_size();

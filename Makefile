@@ -26,12 +26,8 @@ CORE_SOURCES = \
 	$(DRIVER_DIR)/emmc_core.c \
 	$(PROTOCOL_DIR)/emmc_protocol.c
 
-# Advanced features (linked only if used)
-ADVANCED_SOURCES = \
-	$(PROTOCOL_DIR)/emmc_advanced.c
-
 # All sources
-ALL_SOURCES = $(CORE_SOURCES) $(ADVANCED_SOURCES)
+ALL_SOURCES = $(CORE_SOURCES)
 
 # Test and example sources
 EXAMPLE_SOURCES = $(EXAMPLES_DIR)/basic_usage.c
@@ -82,8 +78,7 @@ endif
 
 # Object files
 CORE_OBJECTS = $(CORE_SOURCES:%.c=$(BUILD_DIR)/%$(BUILD_SUFFIX).o)
-ADVANCED_OBJECTS = $(ADVANCED_SOURCES:%.c=$(BUILD_DIR)/%$(BUILD_SUFFIX).o)
-ALL_OBJECTS = $(CORE_OBJECTS) $(ADVANCED_OBJECTS)
+ALL_OBJECTS = $(CORE_OBJECTS)
 
 # Target library names
 FULL_LIB = $(BUILD_DIR)/lib$(PROJECT_NAME)$(BUILD_SUFFIX).a
@@ -91,13 +86,13 @@ MINIMAL_LIB = $(BUILD_DIR)/lib$(PROJECT_NAME)_minimal$(BUILD_SUFFIX).a
 
 # Phony targets
 .PHONY: all clean distclean full minimal examples tests help size info
-.PHONY: tiny embedded secure performance bootloader recovery
+.PHONY: tiny embedded performance bootloader
 .PHONY: debug release minimal_optimized baremetal
 
 # Default target
 all: full
 
-# Full featured library (includes advanced functions)
+# Full featured library
 full: $(FULL_LIB)
 
 $(FULL_LIB): $(ALL_OBJECTS) | $(BUILD_DIR)
@@ -181,7 +176,6 @@ info:
 	@echo ""
 	@echo "=== Source Files ==="
 	@echo "Core Sources: $(CORE_SOURCES)"
-	@echo "Advanced Sources: $(ADVANCED_SOURCES)"
 	@echo ""
 	@echo "=== Available Targets ==="
 	@echo "all, full       - Build full featured library"
@@ -195,7 +189,7 @@ info:
 	@echo "=== Preset Targets ==="
 	@echo "tiny            - Absolute minimum (~6-8KB)"
 	@echo "embedded        - Balanced embedded (~12-14KB)"  
-	@echo "secure          - Security focused (~16-18KB)"
+	@echo ""
 	@echo "performance     - Maximum performance (~20-22KB)"
 	@echo "bootloader      - Bootloader optimized (~10-12KB)"
 	@echo "recovery        - Recovery/update (~16-18KB)"
@@ -228,7 +222,6 @@ help:
 	@echo "Presets:"
 	@echo "  make tiny               # Minimal size build"
 	@echo "  make embedded           # Balanced embedded build"
-	@echo "  make secure             # Security-focused build"
 	@echo "  make bootloader         # Bootloader-optimized build"
 
 # Clean targets
@@ -262,8 +255,6 @@ tiny:
 embedded:
 	$(MAKE) BUILD_TYPE=release LTO=1 BARE_METAL=1 ARM_TARGET=1 EMMC_PRESET=embedded CFLAGS="$(CFLAGS) -DEMMC_PRESET_EMBEDDED"
 
-secure:
-	$(MAKE) BUILD_TYPE=release EMMC_PRESET=secure CFLAGS="$(CFLAGS) -DEMMC_PRESET_SECURE"
 
 performance:
 	$(MAKE) BUILD_TYPE=release LTO=1 EMMC_PRESET=performance CFLAGS="$(CFLAGS) -DEMMC_PRESET_PERFORMANCE"

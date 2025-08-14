@@ -33,7 +33,6 @@
     /* Command set: Basic read/write only */
     #define EMMC_MINIMAL_CMD_SET
     #define EMMC_DISABLE_ERASE
-    #define EMMC_DISABLE_TRIM
     #define EMMC_SINGLE_BLOCK_ONLY
     #define EMMC_DISABLE_CMD23
     
@@ -65,15 +64,9 @@
     #define EMMC_DISABLE_GP_PARTITION    /* No general purpose partitions */
     
     /* Command set: Basic operations + boot support */
-    #define EMMC_DISABLE_SANITIZE
-    #define EMMC_DISABLE_SECURE
-    #define EMMC_DISABLE_BKOPS           /* No background operations */
-    #define EMMC_DISABLE_SLEEP
-    #define EMMC_DISABLE_HPI
     
     /* Keep essential features */
     /* EMMC_COMPILE_ERASE_CMD = 1 (enabled) */
-    /* EMMC_COMPILE_CACHE_CMD = 1 (enabled) */
     /* EMMC_COMPILE_CMD23_SUPPORT = 1 (enabled) */
     
     /* Protocol features: Keep card identification */
@@ -103,15 +96,10 @@
     /* EMMC_COMPILE_RPMB = 1 (enabled) */
     /* EMMC_COMPILE_BOOT_PARTITION = 1 (enabled) */
     
-    /* Command set: Include security commands */
-    /* EMMC_COMPILE_SECURE_CMD = 1 (enabled) */
-    /* EMMC_COMPILE_SANITIZE_CMD = 1 (enabled) */
+    /* Command set: Basic commands only */
     #define EMMC_DISABLE_SLEEP           /* No power management */
-    #define EMMC_DISABLE_HPI
-    #define EMMC_DISABLE_BKOPS
     
-    /* Keep cache for performance */
-    /* EMMC_COMPILE_CACHE_CMD = 1 (enabled) */
+    /* Keep essential features */
     /* EMMC_COMPILE_CMD23_SUPPORT = 1 (enabled) */
     
     /* Protocol features: Full card identification for security */
@@ -174,16 +162,9 @@
     #define EMMC_DISABLE_GP_PARTITION
     
     /* Command set: Basic + boot commands */
-    #define EMMC_DISABLE_SANITIZE
-    #define EMMC_DISABLE_SECURE
-    #define EMMC_DISABLE_BKOPS
-    #define EMMC_DISABLE_SLEEP
-    #define EMMC_DISABLE_HPI
-    #define EMMC_DISABLE_TRIM
     
     /* Keep erase for emergency recovery */
     /* EMMC_COMPILE_ERASE_CMD = 1 (enabled) */
-    /* EMMC_COMPILE_CACHE_CMD = 1 (enabled) */
     /* EMMC_COMPILE_CMD23_SUPPORT = 1 (enabled) */
     
     /* Protocol features: Minimal parsing */
@@ -213,16 +194,11 @@
     /* EMMC_COMPILE_RPMB = 1 (for secure updates) */
     /* EMMC_COMPILE_GP_PARTITION = 1 (for recovery data) */
     
-    /* Command set: Include erase/sanitize for recovery */
+    /* Command set: Include erase for recovery */
     /* EMMC_COMPILE_ERASE_CMD = 1 (enabled) */
-    /* EMMC_COMPILE_SANITIZE_CMD = 1 (enabled) */
-    /* EMMC_COMPILE_SECURE_CMD = 1 (enabled) */
     #define EMMC_DISABLE_BKOPS           /* No background ops during recovery */
-    #define EMMC_DISABLE_SLEEP
-    #define EMMC_DISABLE_HPI
     
-    /* Keep cache and advanced transfers */
-    /* EMMC_COMPILE_CACHE_CMD = 1 (enabled) */
+    /* Keep advanced transfers */
     /* EMMC_COMPILE_CMD23_SUPPORT = 1 (enabled) */
     
     /* Protocol features: Full identification for recovery validation */

@@ -9,7 +9,6 @@
 #define EMMC_CMD2   2   /* ALL_SEND_CID */
 #define EMMC_CMD3   3   /* SET_RELATIVE_ADDR */
 #define EMMC_CMD4   4   /* SET_DSR */
-#define EMMC_CMD5   5   /* SLEEP_AWAKE */
 #define EMMC_CMD6   6   /* SWITCH */
 #define EMMC_CMD7   7   /* SELECT/DESELECT_CARD */
 #define EMMC_CMD8   8   /* SEND_EXT_CSD */
@@ -31,9 +30,6 @@
 #define EMMC_CMD25  25  /* WRITE_MULTIPLE_BLOCK */
 #define EMMC_CMD26  26  /* PROGRAM_CID */
 #define EMMC_CMD27  27  /* PROGRAM_CSD */
-#define EMMC_CMD28  28  /* SET_WRITE_PROT */
-#define EMMC_CMD29  29  /* CLR_WRITE_PROT */
-#define EMMC_CMD30  30  /* SEND_WRITE_PROT */
 #define EMMC_CMD31  31  /* SEND_WRITE_PROT_TYPE */
 #define EMMC_CMD32  32  /* TAG_SECTOR_START */
 #define EMMC_CMD33  33  /* TAG_SECTOR_END */
@@ -44,7 +40,6 @@
 #define EMMC_CMD38  38  /* ERASE */
 #define EMMC_CMD39  39  /* FAST_IO */
 #define EMMC_CMD40  40  /* GO_IRQ_STATE */
-#define EMMC_CMD42  42  /* LOCK_UNLOCK */
 #define EMMC_CMD49  49  /* SET_TIME */
 #define EMMC_CMD55  55  /* APP_CMD */
 #define EMMC_CMD56  56  /* GEN_CMD */
@@ -75,18 +70,11 @@
 #define EXT_CSD_BOOT_CONFIG_PROT        178
 #define EXT_CSD_BOOT_BUS_CONDITIONS     177
 #define EXT_CSD_ERASE_GROUP_DEF         175
-#define EXT_CSD_BOOT_WP_STATUS          174
-#define EXT_CSD_BOOT_WP                 173
-#define EXT_CSD_USER_WP                 171
 #define EXT_CSD_FW_CONFIG               169
 #define EXT_CSD_RPMB_SIZE_MULT          168
 #define EXT_CSD_WR_REL_SET              167
 #define EXT_CSD_WR_REL_PARAM            166
-#define EXT_CSD_SANITIZE_START          165
-#define EXT_CSD_BKOPS_START             164
-#define EXT_CSD_BKOPS_EN                163
 #define EXT_CSD_RST_N_FUNCTION          162
-#define EXT_CSD_HPI_MGMT                161
 #define EXT_CSD_PARTITIONING_SUPPORT    160
 #define EXT_CSD_MAX_ENH_SIZE_MULT       157
 #define EXT_CSD_PARTITIONS_ATTRIBUTE    156
@@ -111,9 +99,6 @@
 #define EXT_CSD_CONTEXT_CONF            37
 #define EXT_CSD_PACKED_COMMAND_STATUS   36
 #define EXT_CSD_PACKED_FAILURE_INDEX    35
-#define EXT_CSD_POWER_OFF_NOTIFICATION  34
-#define EXT_CSD_CACHE_CTRL              33
-#define EXT_CSD_FLUSH_CACHE             32
 
 /* HS_TIMING values */
 #define EXT_CSD_TIMING_LEGACY           0x00

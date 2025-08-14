@@ -199,32 +199,6 @@ emmc_result_t emmc_check_card_status(u32 status);
  */
 emmc_result_t emmc_wait_for_state(emmc_state_t target_state, u32 timeout_ms);
 
-/**
- * @brief Enable or disable card cache
- * @param enable true to enable, false to disable
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_set_cache_enable(bool enable);
-
-/**
- * @brief Flush card cache
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_flush_cache(void);
-
-/**
- * @brief Enable or disable background operations
- * @param enable true to enable, false to disable
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_set_bkops_enable(bool enable);
-
-/**
- * @brief Get card temperature (if supported)
- * @param temperature Pointer to store temperature in Celsius
- * @return EMMC_OK on success, error code otherwise
- */
-emmc_result_t emmc_get_temperature(s8 *temperature);
 
 /* Helper macros */
 #define EMMC_BLOCK_SIZE         512

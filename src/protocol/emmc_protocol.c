@@ -465,12 +465,6 @@ emmc_result_t emmc_optimize_performance(void)
         }
     }
     
-    /* Enable cache if supported */
-    if (result == EMMC_OK && (ext_csd->cache_flush_policy & 0x01)) {
-        /* Cache function is in emmc_advanced.c - will be linked if used */
-        extern emmc_result_t emmc_set_cache_enable(bool enable);
-        emmc_set_cache_enable(true);
-    }
     
     /* Calculate optimal transfer size based on bus configuration */
     switch (target_width) {
@@ -627,7 +621,6 @@ const emmc_card_info_t* emmc_get_card_info(void)
     return &ctx->card_info;
 }
 
-/* Advanced cache functions moved to emmc_advanced.c */
 
 u32 emmc_get_optimal_transfer_size(void)
 {

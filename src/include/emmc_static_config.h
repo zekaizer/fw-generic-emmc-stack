@@ -115,13 +115,6 @@
 /* Minimal command set - only basic read/write */
 #ifdef EMMC_MINIMAL_CMD_SET
     #define EMMC_COMPILE_ERASE_CMD       0
-    #define EMMC_COMPILE_TRIM_CMD        0
-    #define EMMC_COMPILE_SANITIZE_CMD    0
-    #define EMMC_COMPILE_SECURE_CMD      0
-    #define EMMC_COMPILE_BKOPS_CMD       0
-    #define EMMC_COMPILE_CACHE_CMD       0
-    #define EMMC_COMPILE_HPI_CMD         0
-    #define EMMC_COMPILE_SLEEP_CMD       0
 #else
     /* Individual command disabling */
     #ifndef EMMC_DISABLE_ERASE
@@ -130,47 +123,6 @@
         #define EMMC_COMPILE_ERASE_CMD   0
     #endif
 
-    #ifndef EMMC_DISABLE_TRIM
-        #define EMMC_COMPILE_TRIM_CMD    1
-    #else
-        #define EMMC_COMPILE_TRIM_CMD    0
-    #endif
-
-    #ifndef EMMC_DISABLE_SANITIZE
-        #define EMMC_COMPILE_SANITIZE_CMD 1
-    #else
-        #define EMMC_COMPILE_SANITIZE_CMD 0
-    #endif
-
-    #ifndef EMMC_DISABLE_SECURE
-        #define EMMC_COMPILE_SECURE_CMD  1
-    #else
-        #define EMMC_COMPILE_SECURE_CMD  0
-    #endif
-
-    #ifndef EMMC_DISABLE_BKOPS
-        #define EMMC_COMPILE_BKOPS_CMD   1
-    #else
-        #define EMMC_COMPILE_BKOPS_CMD   0
-    #endif
-
-    #ifndef EMMC_DISABLE_CACHE
-        #define EMMC_COMPILE_CACHE_CMD   1
-    #else
-        #define EMMC_COMPILE_CACHE_CMD   0
-    #endif
-
-    #ifndef EMMC_DISABLE_HPI
-        #define EMMC_COMPILE_HPI_CMD     1
-    #else
-        #define EMMC_COMPILE_HPI_CMD     0
-    #endif
-
-    #ifndef EMMC_DISABLE_SLEEP
-        #define EMMC_COMPILE_SLEEP_CMD   1
-    #else
-        #define EMMC_COMPILE_SLEEP_CMD   0
-    #endif
 #endif
 
 /* ========================================================================= */

@@ -142,9 +142,7 @@ emmc_partition_t emmc_get_active_partition(void);
  */
 emmc_result_t emmc_get_partition_size(emmc_partition_t partition, u64 *size_bytes);
 
-/* Write protection and other advanced functions moved to emmc_features.h */
 
-/* Cache functions moved to emmc_features.h */
 
 /**
  * @brief Get card information
@@ -245,8 +243,6 @@ emmc_result_t emmc_rpmb_write_multi(u16 address, const u8 *data, u16 block_count
 emmc_result_t emmc_rpmb_read_multi(u16 address, u8 *data, u16 block_count);
 
 
-/* Advanced Features - Include optional advanced functions */
-#include "emmc_features.h"
 
 /* Utility Functions */
 
