@@ -68,8 +68,9 @@ emmc_result_t emmc_initialize(void)
         return result;
     }
     
-    /* Optimize performance if enabled */
-    if (g_protocol_ctx.config.auto_optimize) {
+    /* Optimize performance if enabled and not statically configured */
+    if (g_protocol_ctx.config.auto_optimize && 
+        (!EMMC_HAS_STATIC_BUS_MODE || !EMMC_HAS_STATIC_BUS_WIDTH)) {
         result = emmc_optimize_performance();
         if (result != EMMC_OK) {
             /* Continue even if optimization fails */
