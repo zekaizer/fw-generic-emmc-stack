@@ -20,6 +20,14 @@ This is a generic eMMC stack firmware project designed for bare-metal environmen
 - Minimal dependencies - prefer self-contained implementations
 - Hardware abstraction layer (HAL) pattern for platform-specific code
 - Interrupt-safe code practices for bare-metal environment
+- **Dead Code Elimination Priority**: All conditional code must prioritize compiler dead code elimination for memory optimization
+
+## Memory Optimization Guidelines
+
+- **Conditional Compilation**: Use `if (STATIC_MACRO)` instead of `#if` for dead code elimination
+- **Constant Propagation**: Leverage compiler optimization for static configuration
+- **Zero Runtime Cost**: Static configurations should have zero runtime overhead
+- **Memory Footprint**: Minimize binary size through compile-time optimization
 
 ## Project Structure
 
