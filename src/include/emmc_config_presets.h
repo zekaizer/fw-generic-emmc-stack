@@ -61,7 +61,6 @@
     /* EMMC_COMPILE_CMD23_SUPPORT = 1 (enabled) */
     
     /* Protocol features: Keep card identification */
-    /* EMMC_COMPILE_EXT_CSD_PARSING = 1 (enabled) */
     /* EMMC_COMPILE_STATUS_CHECK = 1 (enabled) */
     
     /* Error handling: Full error checking */
@@ -94,7 +93,6 @@
     /* EMMC_COMPILE_CMD23_SUPPORT = 1 (enabled) */
     
     /* Protocol features: Full card identification for security */
-    /* EMMC_COMPILE_EXT_CSD_PARSING = 1 (enabled) */
     /* EMMC_COMPILE_CID_PARSING = 1 (enabled) */
     /* EMMC_COMPILE_STATUS_CHECK = 1 (enabled) */
     
@@ -125,7 +123,6 @@
     /* All commands enabled by default */
     
     /* Protocol features: Full feature set */
-    /* EMMC_COMPILE_EXT_CSD_PARSING = 1 (enabled) */
     /* EMMC_COMPILE_CID_PARSING = 1 (enabled) */
     /* EMMC_COMPILE_STATUS_CHECK = 1 (enabled) */
     
@@ -159,7 +156,6 @@
     
     /* Protocol features: Minimal parsing */
     #define EMMC_DISABLE_CARD_IDENTIFICATION  /* Don't need card details */
-    /* EMMC_COMPILE_EXT_CSD_PARSING = 1 (for boot config) */
     /* EMMC_COMPILE_STATUS_CHECK = 1 (for reliability) */
     
     /* Error handling: Essential only */
@@ -191,7 +187,6 @@
     /* EMMC_COMPILE_CMD23_SUPPORT = 1 (enabled) */
     
     /* Protocol features: Full identification for recovery validation */
-    /* EMMC_COMPILE_EXT_CSD_PARSING = 1 (enabled) */
     /* EMMC_COMPILE_CID_PARSING = 1 (enabled) */
     /* EMMC_COMPILE_STATUS_CHECK = 1 (enabled) */
     

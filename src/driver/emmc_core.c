@@ -302,71 +302,20 @@ emmc_result_t emmc_card_initialize(void)
         return result;
     }
     
-    /* Read EXT_CSD */
-    if (EMMC_COMPILE_EXT_CSD_PARSING) {
-        u8 ext_csd_buffer[512];
-        result = emmc_send_command_with_data(EMMC_CMD8, 0, EMMC_RESP_R1,
-                                            ext_csd_buffer, 512, 1, true, response);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        result = emmc_parse_ext_csd(ext_csd_buffer, &g_emmc_ctx.card_info.ext_csd);
-        if (result != EMMC_OK) {
-            return result;
-        }
-        
-        /* Calculate capacity */
-        g_emmc_ctx.card_info.capacity = emmc_calculate_capacity(&g_emmc_ctx.card_info.csd,
-                                                               &g_emmc_ctx.card_info.ext_csd);
-    } else {
-        /* Skip EXT_CSD parsing - use static defaults */
-        /* Initialize EXT_CSD with default values */
-        memset(&g_emmc_ctx.card_info.ext_csd, 0, sizeof(emmc_ext_csd_t));
-        
-        /* Set static configuration values */
-        #ifdef EMMC_STATIC_SECTOR_COUNT
-            g_emmc_ctx.card_info.capacity = EMMC_STATIC_SECTOR_COUNT * EMMC_STATIC_SECTOR_SIZE;
-        #else
-            g_emmc_ctx.card_info.capacity = 8ULL * 1024 * 1024 * 1024; /* Default: 8GB */
-        #endif
-        
-        #ifdef EMMC_STATIC_BUS_MODE
-            /* Set static bus mode support */
-            #if (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400_ES)
-                g_emmc_ctx.card_info.ext_csd.card_type = 0x07; /* HS200 + HS400 + Enhanced Strobe */
-                g_emmc_ctx.card_info.ext_csd.strobe_support = 0x01;
-            #elif (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS400)
-                g_emmc_ctx.card_info.ext_csd.card_type = 0x03; /* HS200 + HS400 */
-            #elif (EMMC_STATIC_BUS_MODE == EMMC_MODE_HS200)
-                g_emmc_ctx.card_info.ext_csd.card_type = 0x02; /* HS200 */
-            #else
-                g_emmc_ctx.card_info.ext_csd.card_type = 0x01; /* SDR/HS */
-            #endif
-        #else
-            g_emmc_ctx.card_info.ext_csd.card_type = 0x07; /* Support all modes */
-            g_emmc_ctx.card_info.ext_csd.strobe_support = 0x01;
-        #endif
-        
-        /* Set partition configuration */
-        g_emmc_ctx.card_info.ext_csd.partition_config = 0x00; /* User partition active */
-        
-        if (EMMC_COMPILE_BOOT_PARTITION) {
-            #ifdef EMMC_STATIC_BOOT_SIZE
-                g_emmc_ctx.card_info.ext_csd.boot_size_mult = EMMC_STATIC_BOOT_SIZE / (128 * 1024);
-            #else
-                g_emmc_ctx.card_info.ext_csd.boot_size_mult = 32; /* Default: 4MB */
-            #endif
-        }
-        
-        if (EMMC_COMPILE_RPMB) {
-            #ifdef EMMC_STATIC_RPMB_SIZE
-                g_emmc_ctx.card_info.ext_csd.rpmb_size_mult = EMMC_STATIC_RPMB_SIZE / (128 * 1024);
-            #else
-                g_emmc_ctx.card_info.ext_csd.rpmb_size_mult = 32; /* Default: 4MB */
-            #endif
-        }
+    u8 ext_csd_buffer[512];
+    result = emmc_send_command_with_data(EMMC_CMD8, 0, EMMC_RESP_R1,
+                                        ext_csd_buffer, 512, 1, true, response);
+    if (result != EMMC_OK) {
+        return result;
     }
+    
+    result = emmc_parse_ext_csd(ext_csd_buffer, &g_emmc_ctx.card_info.ext_csd);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    g_emmc_ctx.card_info.capacity = emmc_calculate_capacity(&g_emmc_ctx.card_info.csd,
+                                                           &g_emmc_ctx.card_info.ext_csd);
     
     /* Set initial state */
     g_emmc_ctx.card_info.state = EMMC_STATE_TRAN;
@@ -491,75 +440,18 @@ emmc_result_t emmc_parse_ext_csd(const u8 *buffer, emmc_ext_csd_t *ext_csd)
         return EMMC_INVALID_PARAM;
     }
     
-    /* Parse key EXT_CSD fields */
     ext_csd->ext_csd_rev = buffer[192];
-    ext_csd->csd_structure = buffer[194];
     ext_csd->card_type = buffer[196];
-    ext_csd->pwr_cl_52_195 = buffer[200];
-    ext_csd->pwr_cl_26_195 = buffer[201];
-    ext_csd->pwr_cl_52_360 = buffer[202];
-    ext_csd->pwr_cl_26_360 = buffer[203];
-    ext_csd->min_perf_r_4_26 = buffer[205];
-    ext_csd->min_perf_w_4_26 = buffer[206];
-    ext_csd->min_perf_r_8_26_4_52 = buffer[207];
-    ext_csd->min_perf_w_8_26_4_52 = buffer[208];
-    ext_csd->min_perf_r_8_52 = buffer[209];
-    ext_csd->min_perf_w_8_52 = buffer[210];
-    
-    /* Sector count (4 bytes, little endian) */
+    ext_csd->bus_width = buffer[183];
+    ext_csd->hs_timing = buffer[185];
+    ext_csd->strobe_support = buffer[184];
     ext_csd->sec_count = (u32)buffer[212] | 
                         ((u32)buffer[213] << 8) |
                         ((u32)buffer[214] << 16) |
                         ((u32)buffer[215] << 24);
-                        
-    ext_csd->sleep_current_vcc = buffer[220];
-    ext_csd->sleep_current_vccq = buffer[221];
-    ext_csd->sleep_awake_timeout = buffer[217];
-    ext_csd->hc_wp_grp_size = (u32)buffer[221];
-    ext_csd->rel_wr_sec_c = buffer[222];
-    ext_csd->erase_timeout_mult = buffer[223];
-    ext_csd->hc_erase_grp_size = buffer[224];
-    ext_csd->acc_size = buffer[225];
-    ext_csd->boot_mult = buffer[226];
-    ext_csd->boot_info = buffer[228];
-    ext_csd->sec_trim_mult = buffer[229];
-    ext_csd->sec_erase_mult = buffer[230];
-    ext_csd->sec_feature_support = buffer[231];
-    ext_csd->trim_mult = buffer[232];
-    
-    ext_csd->pwr_cl_200_195 = buffer[236];
-    ext_csd->pwr_cl_200_360 = buffer[237];
-    ext_csd->pwr_cl_ddr_52_195 = buffer[238];
-    ext_csd->pwr_cl_ddr_52_360 = buffer[239];
-    ext_csd->cache_flush_policy = buffer[240];
-    ext_csd->ini_timeout_ap = buffer[241];
-    
-    ext_csd->correct_prg_sectors_num = (u32)buffer[242] |
-                                      ((u32)buffer[243] << 8) |
-                                      ((u32)buffer[244] << 16) |
-                                      ((u32)buffer[245] << 24);
-                                      
-    ext_csd->bkops_en = buffer[163];
-    ext_csd->bkops_start = buffer[164];
-    ext_csd->sanitize_start = buffer[165];
-    ext_csd->wr_rel_param = buffer[166];
-    ext_csd->wr_rel_set = buffer[167];
-    ext_csd->rpmb_size_mult = buffer[168];
-    ext_csd->fw_config = buffer[169];
-    ext_csd->user_wp = buffer[171];
-    ext_csd->boot_wp = buffer[173];
-    ext_csd->boot_wp_status = buffer[174];
-    ext_csd->erase_group_def = buffer[175];
-    ext_csd->boot_bus_conditions = buffer[177];
-    ext_csd->boot_config_prot = buffer[178];
     ext_csd->partition_config = buffer[179];
-    ext_csd->erased_mem_cont = buffer[181];
-    ext_csd->bus_width = buffer[183];
-    ext_csd->strobe_support = buffer[184];
-    ext_csd->hs_timing = buffer[185];
-    ext_csd->power_class = buffer[187];
-    ext_csd->cmd_set_rev = buffer[189];
-    ext_csd->cmd_set = buffer[191];
+    ext_csd->boot_mult = buffer[226];
+    ext_csd->rpmb_size_mult = buffer[168];
     
     return EMMC_OK;
 }

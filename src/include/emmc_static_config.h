@@ -67,16 +67,6 @@ static const bool EMMC_COMPILE_GP_PARTITION = true;
 /* Protocol Feature Static Settings                                         */
 /* ========================================================================= */
 
-/* Disable EXT_CSD parsing - use hardcoded defaults */
-#ifdef EMMC_DISABLE_EXT_CSD
-    static const bool EMMC_COMPILE_EXT_CSD_PARSING = false;
-    /* Use static defaults */
-    #define EMMC_STATIC_SECTOR_COUNT     (8ULL * 1024 * 1024 * 1024 / 512) /* 8GB default */
-    #define EMMC_STATIC_BOOT_SIZE        (4 * 1024 * 1024)                  /* 4MB default */
-    #define EMMC_STATIC_RPMB_SIZE        (4 * 1024 * 1024)                  /* 4MB default */
-#else
-    static const bool EMMC_COMPILE_EXT_CSD_PARSING = true;
-#endif
 
 /* Disable card status checking - always assume ready */
 #ifdef EMMC_DISABLE_CARD_STATUS_CHECK
