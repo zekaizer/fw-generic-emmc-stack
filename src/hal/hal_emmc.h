@@ -6,37 +6,37 @@
 
 /* HAL-level reset types (abstracted from hardware registers) */
 typedef enum {
-	HAL_EMMC_RESET_ALL = 0,	 /* Reset all controller logic */
-	HAL_EMMC_RESET_CMD = 1,	 /* Reset command line only */
-	HAL_EMMC_RESET_DATA = 2	 /* Reset data line only */
+	HAL_EMMC_RESET_ALL = 0, /* Reset all controller logic */
+	HAL_EMMC_RESET_CMD = 1, /* Reset command line only */
+	HAL_EMMC_RESET_DATA = 2 /* Reset data line only */
 } hal_emmc_reset_type_t;
 
 /* HAL initialization and configuration */
 typedef struct {
-	u32 base_address;		 /* eMMC controller base address */
-	u32 max_clock_freq;	 /* Maximum supported clock frequency */
-	u32 timeout_ms;		 /* Command timeout in milliseconds */
-	bool dma_enabled;		 /* DMA support flag */
-	u8	max_bus_width;		/* Maximum bus width (1, 4, or 8) */
+	u32 base_address;	/* eMMC controller base address */
+	u32 max_clock_freq; /* Maximum supported clock frequency */
+	u32 timeout_ms;		/* Command timeout in milliseconds */
+	bool dma_enabled;	/* DMA support flag */
+	u8 max_bus_width;	/* Maximum bus width (1, 4, or 8) */
 } hal_emmc_config_t;
 
 /* eMMC command structure */
 typedef struct {
-	u8	index;				/* Command index (0-63) */
-	u32 argument;			 /* Command argument */
+	u8 index;					/* Command index (0-63) */
+	u32 argument;				/* Command argument */
 	emmc_resp_type_t resp_type; /* Expected response type */
-	bool data_present;		/* Data transfer expected */
-	bool crc_check;		 /* Enable CRC checking */
-	bool index_check;		 /* Enable index checking */
+	bool data_present;			/* Data transfer expected */
+	bool crc_check;				/* Enable CRC checking */
+	bool index_check;			/* Enable index checking */
 } hal_emmc_cmd_t;
 
 /* Data transfer structure */
 typedef struct {
-	u8	 *buffer;			 /* Data buffer pointer */
-	u32	block_size;		/* Block size in bytes */
-	u32	block_count;		 /* Number of blocks */
-	bool read_operation;	/* true for read, false for write */
-	bool use_dma;			/* Use DMA for transfer */
+	u8 *buffer;			 /* Data buffer pointer */
+	u32 block_size;		 /* Block size in bytes */
+	u32 block_count;	 /* Number of blocks */
+	bool read_operation; /* true for read, false for write */
+	bool use_dma;		 /* Use DMA for transfer */
 } hal_emmc_data_t;
 
 /* HAL function prototypes */
@@ -90,7 +90,7 @@ emmc_result_t hal_emmc_set_timing(emmc_bus_mode_t mode);
  * @return EMMC_OK on success, error code otherwise
  */
 emmc_result_t hal_emmc_send_command(const hal_emmc_cmd_t *cmd,
-									 const hal_emmc_data_t *data);
+									const hal_emmc_data_t *data);
 
 /**
  * @brief Get the response from the last command
@@ -242,17 +242,16 @@ u8 hal_emmc_read_reg8(u32 offset);
  */
 void hal_emmc_write_reg8(u32 offset, u8 value);
 
-
 /* Hardware-specific constants that may need adjustment per platform */
-#define HAL_EMMC_DEFAULT_TIMEOUT_MS	 5000
-#define HAL_EMMC_INIT_CLOCK_FREQ		400000		/* 400 kHz */
-#define HAL_EMMC_HS_CLOCK_FREQ			26000000	/* 26 MHz */
-#define HAL_EMMC_HS200_CLOCK_FREQ		 200000000	 /* 200 MHz */
-#define HAL_EMMC_HS400_CLOCK_FREQ		 200000000	 /* 200 MHz (DDR) */
+#define HAL_EMMC_DEFAULT_TIMEOUT_MS 5000
+#define HAL_EMMC_INIT_CLOCK_FREQ 400000		/* 400 kHz */
+#define HAL_EMMC_HS_CLOCK_FREQ 26000000		/* 26 MHz */
+#define HAL_EMMC_HS200_CLOCK_FREQ 200000000 /* 200 MHz */
+#define HAL_EMMC_HS400_CLOCK_FREQ 200000000 /* 200 MHz (DDR) */
 
 /* Voltage definitions */
-#define HAL_EMMC_VOLTAGE_18V			5
-#define HAL_EMMC_VOLTAGE_30V			6
-#define HAL_EMMC_VOLTAGE_33V			7
+#define HAL_EMMC_VOLTAGE_18V 5
+#define HAL_EMMC_VOLTAGE_30V 6
+#define HAL_EMMC_VOLTAGE_33V 7
 
 #endif /* HAL_EMMC_H */

@@ -16,13 +16,12 @@ typedef struct {
 
 /* Block I/O request structure */
 typedef struct {
-	u64	start_sector;		/* Starting sector number */
-	u32	sector_count;		/* Number of sectors to transfer */
-	u8	 *buffer;			/* Data buffer */
-	bool read_operation;	 /* true for read, false for write */
-	bool reliable_write;	 /* Use reliable write (if supported) */
+	u64 start_sector;	 /* Starting sector number */
+	u32 sector_count;	 /* Number of sectors to transfer */
+	u8 *buffer;			 /* Data buffer */
+	bool read_operation; /* true for read, false for write */
+	bool reliable_write; /* Use reliable write (if supported) */
 } emmc_block_request_t;
-
 
 /* Protocol layer function prototypes */
 
@@ -76,7 +75,6 @@ emmc_result_t emmc_write_sectors(u64 start_sector, u32 sector_count, const u8 *b
  */
 emmc_result_t emmc_block_io(const emmc_block_request_t *request);
 
-
 /**
  * @brief Switch to a different partition
  * @param partition Target partition
@@ -98,14 +96,11 @@ emmc_partition_t emmc_get_active_partition(void);
  */
 emmc_result_t emmc_get_partition_size(emmc_partition_t partition, u64 *size_bytes);
 
-
-
 /**
  * @brief Get card information
  * @return Pointer to card information structure (read-only)
  */
-const emmc_card_info_t* emmc_get_card_info(void);
-
+const emmc_card_info_t *emmc_get_card_info(void);
 
 /**
  * @brief Set bus width and timing mode
@@ -123,9 +118,6 @@ emmc_result_t emmc_set_bus_config(emmc_bus_width_t width, emmc_bus_mode_t mode);
  * @return EMMC_OK on success, error code otherwise
  */
 emmc_result_t emmc_get_bus_config(emmc_bus_width_t *width, emmc_bus_mode_t *mode, u32 *frequency);
-
-
-
 
 /* Utility Functions */
 
@@ -156,10 +148,10 @@ static inline bool emmc_needs_extended_lba(u64 sector_num)
 u32 emmc_get_optimal_transfer_size(void);
 
 /* Constants */
-#define EMMC_SECTOR_SIZE			512
+#define EMMC_SECTOR_SIZE 512
 
 /* Maximum transfer sizes */
-#define EMMC_MAX_SINGLE_TRANSFER	65536	 /* sectors */
-#define EMMC_MAX_MULTI_TRANSFER	 65535	 /* sectors */
+#define EMMC_MAX_SINGLE_TRANSFER 65536 /* sectors */
+#define EMMC_MAX_MULTI_TRANSFER 65535  /* sectors */
 
 #endif /* EMMC_PROTOCOL_H */
