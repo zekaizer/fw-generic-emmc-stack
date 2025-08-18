@@ -1,0 +1,10 @@
+BasedOnStyle: LLVM
+Language: Cpp
+UseTab: Always
+IndentWidth: 4
+TabWidth: 4
+ColumnLimit: 0
+BreakBeforeBraces: Linux
+PointerAlignment: Right
+SortIncludes: false
+InsertNewlineAtEOF: true
