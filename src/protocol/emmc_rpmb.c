@@ -370,10 +370,19 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 half_sector_
         request_frames[i].write_counter = cpu_to_be32(write_counter);
     }
     
+    /* Get RPMB key from external storage */
+    u8 key[EMMC_RPMB_KEY_SIZE];
+    result = g_rpmb_ctx.crypto.get_key(key, EMMC_RPMB_KEY_SIZE);
+    if (result != EMMC_OK) {
+        return result;
+    }
+
     /* Calculate HMAC over all frames (JESD84-B51: concatenated data) */
     void *hmac_ctx = NULL;
-    result = g_rpmb_ctx.crypto.hmac_init(&hmac_ctx, NULL, 0);
+    result = g_rpmb_ctx.crypto.hmac_init(&hmac_ctx, key, EMMC_RPMB_KEY_SIZE);
     if (result != EMMC_OK) {
+        /* Clear key from memory for security */
+        memset(key, 0, EMMC_RPMB_KEY_SIZE);
         return result;
     }
     
@@ -390,6 +399,10 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 half_sector_
     /* Finalize HMAC and place in last frame only (JESD84-B51) */
     result = g_rpmb_ctx.crypto.hmac_final(hmac_ctx, request_frames[half_sector_count - 1].key_mac, 
                                          EMMC_RPMB_MAC_SIZE);
+    
+    /* Clear key from memory for security */
+    memset(key, 0, EMMC_RPMB_KEY_SIZE);
+    
     if (result != EMMC_OK) {
         return result;
     }
@@ -469,10 +482,19 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 half_sector_count)
         return result;
     }
     
+    /* Get RPMB key from external storage */
+    u8 key[EMMC_RPMB_KEY_SIZE];
+    result = g_rpmb_ctx.crypto.get_key(key, EMMC_RPMB_KEY_SIZE);
+    if (result != EMMC_OK) {
+        return result;
+    }
+
     /* Verify MAC using streaming HMAC */
     void *hmac_ctx = NULL;
-    result = g_rpmb_ctx.crypto.hmac_init(&hmac_ctx, NULL, 0);
+    result = g_rpmb_ctx.crypto.hmac_init(&hmac_ctx, key, EMMC_RPMB_KEY_SIZE);
     if (result != EMMC_OK) {
+        /* Clear key from memory for security */
+        memset(key, 0, EMMC_RPMB_KEY_SIZE);
         return result;
     }
     
@@ -489,6 +511,10 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 half_sector_count)
     /* Calculate expected MAC */
     u8 expected_mac[EMMC_RPMB_MAC_SIZE];
     result = g_rpmb_ctx.crypto.hmac_final(hmac_ctx, expected_mac, EMMC_RPMB_MAC_SIZE);
+    
+    /* Clear key from memory for security */
+    memset(key, 0, EMMC_RPMB_KEY_SIZE);
+    
     if (result != EMMC_OK) {
         return result;
     }
