@@ -284,8 +284,28 @@ emmc_result_t emmc_rpmb_program_key(const u8 *key)
     result = emmc_send_command_with_data(EMMC_CMD25, 0, EMMC_RESP_R1,
                                         (u8*)frame, sizeof(emmc_rpmb_frame_t),
                                         1, false, NULL);
+    if (result != EMMC_OK) {
+        return result;
+    }
     
-    return result;
+    /* Clear request frame for result read */
+    memset(frame, 0, sizeof(emmc_rpmb_frame_t));
+    frame->req_resp = cpu_to_be16(EMMC_RPMB_READ_RESULT);
+    
+    /* Send result read request */
+    result = emmc_rpmb_send_request_frames(frame, 1, false);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Get result response */
+    result = emmc_rpmb_get_response_frames(frame, 1);
+    if (result != EMMC_OK) {
+        return result;
+    }
+    
+    /* Check RPMB result code */
+    return emmc_rpmb_map_result_code(be16_to_cpu(frame->result));
 }
 
 emmc_result_t emmc_rpmb_get_write_counter(u32 *counter)
