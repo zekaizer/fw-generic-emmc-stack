@@ -2,6 +2,8 @@
 
 This document provides a comprehensive reference for RPMB (Replay Protected Memory Block) protocol implementation based on JESD84-B51 specification.
 
+> **Note**: For detailed RPMB specification information including frame structure, field layouts, and constraints, see [jesd84-b51-rpmb-spec.md](jesd84-b51-rpmb-spec.md).
+
 ## Table of Contents
 
 - [RPMB Frame Types](#rpmb-frame-types)
@@ -234,6 +236,7 @@ Where Frame_Metadata includes:
 
 ## References
 
+- [jesd84-b51-rpmb-spec.md](jesd84-b51-rpmb-spec.md): Detailed RPMB specification reference
 - JESD84-B51: eMMC Electrical Standard 5.1
 - Section 6.6.22: RPMB Partition Protocol
 - FIPS 198-1: HMAC-SHA256 Specification
