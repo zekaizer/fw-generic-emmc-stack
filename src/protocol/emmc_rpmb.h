@@ -19,8 +19,8 @@ typedef struct {
 	u8	data[256];			/* Data payload */
 	u8	nonce[16];			/* Nonce */
 	__be32 write_counter;	 /* Write counter (big-endian per JESD84-B51) */
-	__be16 address;		 /* Block address (big-endian per JESD84-B51) */
-	__be16 block_count;	 /* Block count (big-endian per JESD84-B51) */
+	__be16 address;		 /* Half-sector address (0-based, big-endian per JESD84-B51) */
+	__be16 block_count;	 /* Number of half-sectors (big-endian per JESD84-B51) */
 	__be16 result;			/* Result code (big-endian per JESD84-B51) */
 	__be16 req_resp;		/* Request/Response type (big-endian per JESD84-B51) */
 } __attribute__((packed)) emmc_rpmb_frame_t;
@@ -71,38 +71,40 @@ emmc_result_t emmc_rpmb_program_key(const u8 *key);
 emmc_result_t emmc_rpmb_get_write_counter(u32 *counter);
 
 /**
- * @brief Write data to RPMB partition (single/multi-block optimized)
- * @param address Block address (0-based)
- * @param data Data to write (256 bytes per block)
- * @param block_count Number of blocks to write (max: EMMC_RPMB_MAX_BLOCKS)
+ * @brief Write data to RPMB partition (single/multi-frame optimized)
+ * @param address Half-sector address (0-based, 256-byte units per JESD84-B51)
+ * @param data Data to write (256 bytes per half-sector)
+ * @param half_sector_count Number of half-sectors to write (max: EMMC_RPMB_MAX_FRAMES)
  * @return EMMC_OK on success, error code otherwise
  *
- * Note: Uses key from crypto interface. Optimized for both single and multi-block
+ * Note: Uses key from crypto interface. Optimized for both single and multi-frame
  * operations. Batches operations and uses streaming HMAC for efficiency.
  */
-emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count);
+emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 half_sector_count);
 
 /**
- * @brief Read data from RPMB partition (single/multi-block optimized)
- * @param address Block address (0-based)
- * @param data Buffer to store read data (256 bytes per block)
- * @param block_count Number of blocks to read (max: EMMC_RPMB_MAX_BLOCKS)
+ * @brief Read data from RPMB partition (single/multi-frame optimized)
+ * @param address Half-sector address (0-based, 256-byte units per JESD84-B51)
+ * @param data Buffer to store read data (256 bytes per half-sector)
+ * @param half_sector_count Number of half-sectors to read (max: EMMC_RPMB_MAX_FRAMES)
  * @return EMMC_OK on success, error code otherwise
  *
- * Note: Uses key from crypto interface. Optimized for both single and multi-block
- * operations. Reads all blocks in single transaction for best performance.
+ * Note: Uses key from crypto interface. Optimized for both single and multi-frame
+ * operations. Reads all half-sectors in single transaction for best performance.
  */
-emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count);
+emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 half_sector_count);
 
 
-/* RPMB Constants */
-#define EMMC_RPMB_BLOCK_SIZE		256
-#define EMMC_RPMB_KEY_SIZE			32
-#define EMMC_RPMB_METADATA_SIZE	 30	 /* Size of metadata from nonce to req_resp (16+4+2+2+2+2+2) per JESD84-B51 */
+/* RPMB Constants per JESD84-B51 Section 6.6.22 */
+#define EMMC_RPMB_DATA_SIZE			256	/* Half-sector data size per JESD84-B51 */
+#define EMMC_RPMB_HALF_SECTOR_SIZE	256	/* Alias for data size clarity */
+#define EMMC_RPMB_FRAME_SIZE		512	/* Full RPMB frame size (half sector) */
+#define EMMC_RPMB_KEY_SIZE			32	/* Authentication key size */
+#define EMMC_RPMB_METADATA_SIZE		30	/* Size of metadata from nonce to req_resp (16+4+2+2+2+2+2) per JESD84-B51 */
 #define EMMC_RPMB_HMAC_DATA_SIZE	286	/* Size of data+metadata for HMAC (256+30) per JESD84-B51 */
-#define EMMC_RPMB_MAC_SIZE			32
-#define EMMC_RPMB_NONCE_SIZE		16
-#define EMMC_RPMB_MAX_BLOCKS		32	 /* Maximum blocks per RPMB transaction */
+#define EMMC_RPMB_MAC_SIZE			32	/* HMAC-SHA256 output size */
+#define EMMC_RPMB_NONCE_SIZE		16	/* Random nonce size */
+#define EMMC_RPMB_MAX_FRAMES		32	/* Maximum frames per RPMB transaction */
 
 /* RPMB result codes */
 #define EMMC_RPMB_RESULT_OK				 0x0000

@@ -94,7 +94,7 @@ static emmc_result_t emmc_rpmb_send_request_frames(const emmc_rpmb_frame_t *req_
 {
     emmc_result_t result;
     
-    if (!req_frames || frame_count == 0 || frame_count > EMMC_RPMB_MAX_BLOCKS) {
+    if (!req_frames || frame_count == 0 || frame_count > EMMC_RPMB_MAX_FRAMES) {
         return EMMC_INVALID_PARAM;
     }
     
@@ -106,7 +106,7 @@ static emmc_result_t emmc_rpmb_send_request_frames(const emmc_rpmb_frame_t *req_
         }
     }
     
-    /* Set block count with reliable write flag if needed */
+    /* Set frame count with reliable write flag if needed */
     u32 cmd23_arg = frame_count;
     if (reliable_write) {
         cmd23_arg |= (1U << 31);  /* Set reliable write flag */
@@ -133,11 +133,11 @@ static emmc_result_t emmc_rpmb_get_response_frames(emmc_rpmb_frame_t *resp_frame
 {
     emmc_result_t result;
     
-    if (!resp_frames || frame_count == 0 || frame_count > EMMC_RPMB_MAX_BLOCKS) {
+    if (!resp_frames || frame_count == 0 || frame_count > EMMC_RPMB_MAX_FRAMES) {
         return EMMC_INVALID_PARAM;
     }
     
-    /* Set block count for response read */
+    /* Set frame count for response read */
     result = emmc_send_command(EMMC_CMD23, frame_count, EMMC_RESP_R1, NULL);
     if (result != EMMC_OK) {
         return result;
@@ -318,13 +318,13 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter)
 /**
  * @brief Write data to RPMB partition (JESD84-B51 compliant)
  */
-emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
+emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 half_sector_count)
 {
     emmc_result_t result;
     u32 write_counter;
     u8 nonce[EMMC_RPMB_NONCE_SIZE];
     
-    if (!g_rpmb_ctx.initialized || !data || block_count == 0 || block_count > EMMC_RPMB_MAX_BLOCKS) {
+    if (!g_rpmb_ctx.initialized || !data || half_sector_count == 0 || half_sector_count > EMMC_RPMB_MAX_FRAMES) {
         return EMMC_INVALID_PARAM;
     }
     
@@ -341,15 +341,15 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
     }
     
     /* Prepare request frames */
-    static emmc_rpmb_frame_t request_frames[EMMC_RPMB_MAX_BLOCKS];
+    static emmc_rpmb_frame_t request_frames[EMMC_RPMB_MAX_FRAMES];
     
-    for (u16 i = 0; i < block_count; i++) {
+    for (u16 i = 0; i < half_sector_count; i++) {
         emmc_rpmb_prepare_frame(&request_frames[i], EMMC_RPMB_WRITE_DATA, 
-                               address + i, block_count, nonce);
+                               address + i, half_sector_count, nonce);
         
         /* Copy data */
-        memcpy(request_frames[i].data, data + (i * EMMC_RPMB_BLOCK_SIZE), 
-               EMMC_RPMB_BLOCK_SIZE);
+        memcpy(request_frames[i].data, data + (i * EMMC_RPMB_DATA_SIZE), 
+               EMMC_RPMB_DATA_SIZE);
         
         /* Set write counter in big-endian format (JESD84-B51: same counter for all frames) */
         request_frames[i].write_counter = cpu_to_be32(write_counter);
@@ -362,9 +362,9 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
         return result;
     }
     
-    /* Stream HMAC calculation over all frame data (optimized: data+metadata as single block) */
-    for (u16 i = 0; i < block_count; i++) {
-        /* Add frame data+metadata to HMAC as contiguous block (JESD84-B51 big-endian format) */
+    /* Stream HMAC calculation over all frame data (optimized: data+metadata as single frame) */
+    for (u16 i = 0; i < half_sector_count; i++) {
+        /* Add frame data+metadata to HMAC as contiguous frame (JESD84-B51 big-endian format) */
         result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, request_frames[i].data, 
                                               EMMC_RPMB_HMAC_DATA_SIZE);
         if (result != EMMC_OK) {
@@ -373,14 +373,14 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
     }
     
     /* Finalize HMAC and place in last frame only (JESD84-B51) */
-    result = g_rpmb_ctx.crypto.hmac_final(hmac_ctx, request_frames[block_count - 1].key_mac, 
+    result = g_rpmb_ctx.crypto.hmac_final(hmac_ctx, request_frames[half_sector_count - 1].key_mac, 
                                          EMMC_RPMB_MAC_SIZE);
     if (result != EMMC_OK) {
         return result;
     }
     
     /* Send request frames with reliable write */
-    result = emmc_rpmb_send_request_frames(request_frames, block_count, true);
+    result = emmc_rpmb_send_request_frames(request_frames, half_sector_count, true);
     if (result != EMMC_OK) {
         return result;
     }
@@ -410,12 +410,12 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 block_count)
 /**
  * @brief Read data from RPMB partition (JESD84-B51 compliant)
  */
-emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
+emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 half_sector_count)
 {
     emmc_result_t result;
     u8 nonce[EMMC_RPMB_NONCE_SIZE];
     
-    if (!g_rpmb_ctx.initialized || !data || block_count == 0 || block_count > EMMC_RPMB_MAX_BLOCKS) {
+    if (!g_rpmb_ctx.initialized || !data || half_sector_count == 0 || half_sector_count > EMMC_RPMB_MAX_FRAMES) {
         return EMMC_INVALID_PARAM;
     }
     
@@ -428,7 +428,7 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
     /* Prepare read request frame */
     emmc_rpmb_frame_t request_frame = {0};
     emmc_rpmb_prepare_frame(&request_frame, EMMC_RPMB_READ_DATA, 
-                           address, block_count, nonce);
+                           address, half_sector_count, nonce);
     
     /* Send read request */
     result = emmc_rpmb_send_request_frames(&request_frame, 1, false);
@@ -437,8 +437,8 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
     }
     
     /* Get response frames */
-    static emmc_rpmb_frame_t response_frames[EMMC_RPMB_MAX_BLOCKS];
-    result = emmc_rpmb_get_response_frames(response_frames, block_count);
+    static emmc_rpmb_frame_t response_frames[EMMC_RPMB_MAX_FRAMES];
+    result = emmc_rpmb_get_response_frames(response_frames, half_sector_count);
     if (result != EMMC_OK) {
         return result;
     }
@@ -461,9 +461,9 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
         return result;
     }
     
-    /* Stream HMAC calculation over all response frame data (optimized: data+metadata as single block) */
-    for (u16 i = 0; i < block_count; i++) {
-        /* Add frame data+metadata to HMAC as contiguous block (JESD84-B51 big-endian format) */
+    /* Stream HMAC calculation over all response frame data (optimized: data+metadata as single frame) */
+    for (u16 i = 0; i < half_sector_count; i++) {
+        /* Add frame data+metadata to HMAC as contiguous frame (JESD84-B51 big-endian format) */
         result = g_rpmb_ctx.crypto.hmac_update(hmac_ctx, response_frames[i].data, 
                                               EMMC_RPMB_HMAC_DATA_SIZE);
         if (result != EMMC_OK) {
@@ -479,15 +479,15 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count)
     }
     
     /* Verify MAC from last response frame (JESD84-B51) */
-    if (emmc_rpmb_constant_time_memcmp(expected_mac, response_frames[block_count - 1].key_mac, 
+    if (emmc_rpmb_constant_time_memcmp(expected_mac, response_frames[half_sector_count - 1].key_mac, 
                EMMC_RPMB_MAC_SIZE) != 0) {
         return EMMC_ERROR;
     }
     
     /* Copy data to output buffer */
-    for (u16 i = 0; i < block_count; i++) {
-        memcpy(data + (i * EMMC_RPMB_BLOCK_SIZE), response_frames[i].data, 
-               EMMC_RPMB_BLOCK_SIZE);
+    for (u16 i = 0; i < half_sector_count; i++) {
+        memcpy(data + (i * EMMC_RPMB_DATA_SIZE), response_frames[i].data, 
+               EMMC_RPMB_DATA_SIZE);
     }
     
     return EMMC_OK;
