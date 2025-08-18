@@ -47,14 +47,19 @@ typedef struct {
 /* RPMB Functions */
 
 /**
- * @brief Initialize RPMB with external crypto interface
+ * @brief Initialize RPMB with external crypto interface and frame buffer
  * @param crypto_interface External cryptographic functions (ALL functions REQUIRED)
+ * @param frame_buffer External buffer for RPMB frames (REQUIRED)
+ * @param max_frames Number of frames in buffer (minimum 1 frame required)
  * @return EMMC_OK on success, error code otherwise
  *
  * @note Required functions: get_key, generate_nonce, hmac_init, hmac_update, hmac_final.
  *		 All HMAC operations use streaming interface for memory efficiency.
+ *		 Frame buffer must remain valid throughout RPMB operations.
  */
-emmc_result_t emmc_rpmb_init(const emmc_rpmb_crypto_interface_t *crypto_interface);
+emmc_result_t emmc_rpmb_init(const emmc_rpmb_crypto_interface_t *crypto_interface,
+							emmc_rpmb_frame_t *frame_buffer,
+							u32 max_frames);
 
 /**
  * @brief Program RPMB authentication key
@@ -74,7 +79,7 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter);
  * @brief Write data to RPMB partition (single/multi-frame optimized)
  * @param address Half-sector address (0-based, 256-byte units per JESD84-B51)
  * @param data Data to write (256 bytes per half-sector)
- * @param half_sector_count Number of half-sectors to write (max: EMMC_RPMB_MAX_FRAMES)
+ * @param half_sector_count Number of half-sectors to write (limited by buffer size)
  * @return EMMC_OK on success, error code otherwise
  *
  * Note: Uses key from crypto interface. Optimized for both single and multi-frame
@@ -86,7 +91,7 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 half_sector_
  * @brief Read data from RPMB partition (single/multi-frame optimized)
  * @param address Half-sector address (0-based, 256-byte units per JESD84-B51)
  * @param data Buffer to store read data (256 bytes per half-sector)
- * @param half_sector_count Number of half-sectors to read (max: EMMC_RPMB_MAX_FRAMES)
+ * @param half_sector_count Number of half-sectors to read (limited by buffer size)
  * @return EMMC_OK on success, error code otherwise
  *
  * Note: Uses key from crypto interface. Optimized for both single and multi-frame
@@ -104,7 +109,6 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 half_sector_count);
 #define EMMC_RPMB_HMAC_DATA_SIZE	284	/* Size of data+metadata for HMAC (256+28) per JESD84-B51 */
 #define EMMC_RPMB_MAC_SIZE			32	/* HMAC-SHA256 output size */
 #define EMMC_RPMB_NONCE_SIZE		16	/* Random nonce size */
-#define EMMC_RPMB_MAX_FRAMES		32	/* Maximum frames per RPMB transaction */
 
 /* RPMB result codes */
 #define EMMC_RPMB_RESULT_OK				 0x0000

@@ -14,6 +14,8 @@ extern emmc_result_t emmc_send_command_with_data(u8 cmd_index, u32 arg, emmc_res
 /* RPMB context */
 static struct {
     emmc_rpmb_crypto_interface_t crypto;
+    emmc_rpmb_frame_t *frame_buffer;
+    u32 max_frames;
     bool initialized;
 } g_rpmb_ctx = {0};
 
@@ -94,7 +96,7 @@ static emmc_result_t emmc_rpmb_send_request_frames(const emmc_rpmb_frame_t *req_
 {
     emmc_result_t result;
     
-    if (!req_frames || frame_count == 0 || frame_count > EMMC_RPMB_MAX_FRAMES) {
+    if (!req_frames || frame_count == 0 || frame_count > g_rpmb_ctx.max_frames) {
         return EMMC_INVALID_PARAM;
     }
     
@@ -133,7 +135,7 @@ static emmc_result_t emmc_rpmb_get_response_frames(emmc_rpmb_frame_t *resp_frame
 {
     emmc_result_t result;
     
-    if (!resp_frames || frame_count == 0 || frame_count > EMMC_RPMB_MAX_FRAMES) {
+    if (!resp_frames || frame_count == 0 || frame_count > g_rpmb_ctx.max_frames) {
         return EMMC_INVALID_PARAM;
     }
     
@@ -226,9 +228,11 @@ static void emmc_rpmb_generate_nonce(u8 *nonce)
 
 /* RPMB Public Functions */
 
-emmc_result_t emmc_rpmb_init(const emmc_rpmb_crypto_interface_t *crypto_interface)
+emmc_result_t emmc_rpmb_init(const emmc_rpmb_crypto_interface_t *crypto_interface,
+							   emmc_rpmb_frame_t *frame_buffer,
+							   u32 max_frames)
 {
-    if (!crypto_interface) {
+    if (!crypto_interface || !frame_buffer || max_frames == 0) {
         return EMMC_INVALID_PARAM;
     }
     
@@ -240,6 +244,8 @@ emmc_result_t emmc_rpmb_init(const emmc_rpmb_crypto_interface_t *crypto_interfac
     }
     
     g_rpmb_ctx.crypto = *crypto_interface;
+    g_rpmb_ctx.frame_buffer = frame_buffer;
+    g_rpmb_ctx.max_frames = max_frames;
     g_rpmb_ctx.initialized = true;
     
     return EMMC_OK;
@@ -247,7 +253,7 @@ emmc_result_t emmc_rpmb_init(const emmc_rpmb_crypto_interface_t *crypto_interfac
 
 emmc_result_t emmc_rpmb_program_key(const u8 *key)
 {
-    emmc_rpmb_frame_t frame = {0};
+    emmc_rpmb_frame_t *frame;
     emmc_result_t result;
     
     if (!g_rpmb_ctx.initialized || !key) {
@@ -260,19 +266,23 @@ emmc_result_t emmc_rpmb_program_key(const u8 *key)
         return result;
     }
     
+    /* Use first frame from buffer */
+    frame = &g_rpmb_ctx.frame_buffer[0];
+    memset(frame, 0, sizeof(emmc_rpmb_frame_t));
+    
     /* Prepare RPMB frame for key programming */
-    frame.req_resp = cpu_to_be16(EMMC_RPMB_WRITE_KEY);
+    frame->req_resp = cpu_to_be16(EMMC_RPMB_WRITE_KEY);
     
     /* Copy key to frame */
     for (int i = 0; i < EMMC_RPMB_KEY_SIZE; i++) {
-        frame.key_mac[i] = key[i];
+        frame->key_mac[i] = key[i];
     }
     
     /* Key will be programmed directly to the eMMC, no injection needed */
     
     /* Send RPMB write key command */
     result = emmc_send_command_with_data(EMMC_CMD25, 0, EMMC_RESP_R1,
-                                        (u8*)&frame, sizeof(emmc_rpmb_frame_t),
+                                        (u8*)frame, sizeof(emmc_rpmb_frame_t),
                                         1, false, NULL);
     
     return result;
@@ -280,8 +290,8 @@ emmc_result_t emmc_rpmb_program_key(const u8 *key)
 
 emmc_result_t emmc_rpmb_get_write_counter(u32 *counter)
 {
-    emmc_rpmb_frame_t request_frame = {0};
-    emmc_rpmb_frame_t response_frame = {0};
+    emmc_rpmb_frame_t *request_frame;
+    emmc_rpmb_frame_t *response_frame;
     emmc_result_t result;
     
     if (!g_rpmb_ctx.initialized || !counter) {
@@ -294,25 +304,30 @@ emmc_result_t emmc_rpmb_get_write_counter(u32 *counter)
         return result;
     }
     
+    /* Use frames from buffer */
+    request_frame = &g_rpmb_ctx.frame_buffer[0];
+    response_frame = &g_rpmb_ctx.frame_buffer[0];  /* Reuse same frame after request */
+    
     /* Prepare request frame */
-    request_frame.req_resp = cpu_to_be16(EMMC_RPMB_READ_WCOUNTER);
+    memset(request_frame, 0, sizeof(emmc_rpmb_frame_t));
+    request_frame->req_resp = cpu_to_be16(EMMC_RPMB_READ_WCOUNTER);
     
     /* Send write counter read request (JESD84-B51: 1 frame request) */
-    result = emmc_rpmb_send_request_frames(&request_frame, 1, false);
+    result = emmc_rpmb_send_request_frames(request_frame, 1, false);
     if (result != EMMC_OK) {
         return result;
     }
     
     /* Get response (JESD84-B51: 1 frame response) */
-    result = emmc_rpmb_get_response_frames(&response_frame, 1);
+    result = emmc_rpmb_get_response_frames(response_frame, 1);
     if (result != EMMC_OK) {
         return result;
     }
     
     /* Extract write counter from big-endian format */
-    *counter = be32_to_cpu(response_frame.write_counter);
+    *counter = be32_to_cpu(response_frame->write_counter);
     
-    return emmc_rpmb_map_result_code(be16_to_cpu(response_frame.result));
+    return emmc_rpmb_map_result_code(be16_to_cpu(response_frame->result));
 }
 
 /**
@@ -324,7 +339,7 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 half_sector_
     u32 write_counter;
     u8 nonce[EMMC_RPMB_NONCE_SIZE];
     
-    if (!g_rpmb_ctx.initialized || !data || half_sector_count == 0 || half_sector_count > EMMC_RPMB_MAX_FRAMES) {
+    if (!g_rpmb_ctx.initialized || !data || half_sector_count == 0 || half_sector_count > g_rpmb_ctx.max_frames) {
         return EMMC_INVALID_PARAM;
     }
     
@@ -340,8 +355,8 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 half_sector_
         return result;
     }
     
-    /* Prepare request frames */
-    static emmc_rpmb_frame_t request_frames[EMMC_RPMB_MAX_FRAMES];
+    /* Use frames from buffer */
+    emmc_rpmb_frame_t *request_frames = g_rpmb_ctx.frame_buffer;
     
     for (u16 i = 0; i < half_sector_count; i++) {
         emmc_rpmb_prepare_frame(&request_frames[i], EMMC_RPMB_WRITE_DATA, 
@@ -385,21 +400,21 @@ emmc_result_t emmc_rpmb_write_data(u16 address, const u8 *data, u16 half_sector_
         return result;
     }
     
-    /* Get result frame */
-    emmc_rpmb_frame_t response_frame = {0};
-    result = emmc_rpmb_get_response_frames(&response_frame, 1);
+    /* Get result frame - reuse first frame in buffer */
+    emmc_rpmb_frame_t *response_frame = &g_rpmb_ctx.frame_buffer[0];
+    result = emmc_rpmb_get_response_frames(response_frame, 1);
     if (result != EMMC_OK) {
         return result;
     }
     
     /* Check RPMB result */
-    result = emmc_rpmb_map_result_code(be16_to_cpu(response_frame.result));
+    result = emmc_rpmb_map_result_code(be16_to_cpu(response_frame->result));
     if (result != EMMC_OK) {
         return result;
     }
     
     /* Verify write counter incremented correctly (JESD84-B51) */
-    result = emmc_rpmb_verify_write_counter(write_counter, be32_to_cpu(response_frame.write_counter));
+    result = emmc_rpmb_verify_write_counter(write_counter, be32_to_cpu(response_frame->write_counter));
     if (result != EMMC_OK) {
         return result;
     }
@@ -415,7 +430,7 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 half_sector_count)
     emmc_result_t result;
     u8 nonce[EMMC_RPMB_NONCE_SIZE];
     
-    if (!g_rpmb_ctx.initialized || !data || half_sector_count == 0 || half_sector_count > EMMC_RPMB_MAX_FRAMES) {
+    if (!g_rpmb_ctx.initialized || !data || half_sector_count == 0 || half_sector_count > g_rpmb_ctx.max_frames) {
         return EMMC_INVALID_PARAM;
     }
     
@@ -425,19 +440,19 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 half_sector_count)
         return result;
     }
     
-    /* Prepare read request frame */
-    emmc_rpmb_frame_t request_frame = {0};
-    emmc_rpmb_prepare_frame(&request_frame, EMMC_RPMB_READ_DATA, 
+    /* Prepare read request frame using first frame in buffer */
+    emmc_rpmb_frame_t *request_frame = &g_rpmb_ctx.frame_buffer[0];
+    emmc_rpmb_prepare_frame(request_frame, EMMC_RPMB_READ_DATA, 
                            address, half_sector_count, nonce);
     
     /* Send read request */
-    result = emmc_rpmb_send_request_frames(&request_frame, 1, false);
+    result = emmc_rpmb_send_request_frames(request_frame, 1, false);
     if (result != EMMC_OK) {
         return result;
     }
     
-    /* Get response frames */
-    static emmc_rpmb_frame_t response_frames[EMMC_RPMB_MAX_FRAMES];
+    /* Use frames from buffer */
+    emmc_rpmb_frame_t *response_frames = g_rpmb_ctx.frame_buffer;
     result = emmc_rpmb_get_response_frames(response_frames, half_sector_count);
     if (result != EMMC_OK) {
         return result;

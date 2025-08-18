@@ -182,15 +182,28 @@ static void test_rpmb_init(void)
     
     printf("\n=== Test 1: RPMB Initialization ===\n");
     
+    /* Allocate RPMB frame buffer for tests */
+    static emmc_rpmb_frame_t test_frame_buffer[32];  /* 32 frames = 16KB */
+    
     /* Test with NULL interface */
-    result = emmc_rpmb_init(NULL);
+    result = emmc_rpmb_init(NULL, test_frame_buffer, 32);
     assert(result == EMMC_INVALID_PARAM);
     printf("✓ NULL interface rejected\n");
     
-    /* Test with valid interface */
-    result = emmc_rpmb_init(&mock_crypto_interface);
+    /* Test with NULL buffer */
+    result = emmc_rpmb_init(&mock_crypto_interface, NULL, 32);
+    assert(result == EMMC_INVALID_PARAM);
+    printf("✓ NULL buffer rejected\n");
+    
+    /* Test with zero frames */
+    result = emmc_rpmb_init(&mock_crypto_interface, test_frame_buffer, 0);
+    assert(result == EMMC_INVALID_PARAM);
+    printf("✓ Zero frames rejected\n");
+    
+    /* Test with valid interface and buffer */
+    result = emmc_rpmb_init(&mock_crypto_interface, test_frame_buffer, 32);
     assert(result == EMMC_OK);
-    printf("✓ Valid interface accepted\n");
+    printf("✓ Valid interface and buffer accepted\n");
     
     printf("Test 1 PASSED\n");
 }
@@ -425,7 +438,8 @@ void rpmb_usage_example(void)
     printf("\n=== RPMB Usage Example ===\n");
     
     /* 1. Initialize RPMB with crypto interface */
-    emmc_rpmb_init(&mock_crypto_interface);
+    static emmc_rpmb_frame_t example_frame_buffer[8];  /* 8 frames for example */
+    emmc_rpmb_init(&mock_crypto_interface, example_frame_buffer, 8);
     
     /* 2. Program authentication key (one-time only) */
     u8 auth_key[32];

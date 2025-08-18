@@ -257,7 +257,10 @@ emmc_result_t example_rpmb_init(void)
         .verify_hmac = example_crypto_verify_hmac
     };
     
-    return emmc_rpmb_init(&crypto_interface);
+    /* Allocate RPMB frame buffer for operations */
+    static emmc_rpmb_frame_t rpmb_frame_buffer[16];  /* 16 frames = 8KB */
+    
+    return emmc_rpmb_init(&crypto_interface, rpmb_frame_buffer, 16);
 }
 
 /*
