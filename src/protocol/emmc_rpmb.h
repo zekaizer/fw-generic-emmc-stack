@@ -100,8 +100,8 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 half_sector_count);
 #define EMMC_RPMB_HALF_SECTOR_SIZE	256	/* Alias for data size clarity */
 #define EMMC_RPMB_FRAME_SIZE		512	/* Full RPMB frame size (half sector) */
 #define EMMC_RPMB_KEY_SIZE			32	/* Authentication key size */
-#define EMMC_RPMB_METADATA_SIZE		30	/* Size of metadata from nonce to req_resp (16+4+2+2+2+2+2) per JESD84-B51 */
-#define EMMC_RPMB_HMAC_DATA_SIZE	286	/* Size of data+metadata for HMAC (256+30) per JESD84-B51 */
+#define EMMC_RPMB_METADATA_SIZE		28	/* Size of metadata from nonce to req_resp (16+4+2+2+2+2) per JESD84-B51 */
+#define EMMC_RPMB_HMAC_DATA_SIZE	284	/* Size of data+metadata for HMAC (256+28) per JESD84-B51 */
 #define EMMC_RPMB_MAC_SIZE			32	/* HMAC-SHA256 output size */
 #define EMMC_RPMB_NONCE_SIZE		16	/* Random nonce size */
 #define EMMC_RPMB_MAX_FRAMES		32	/* Maximum frames per RPMB transaction */
