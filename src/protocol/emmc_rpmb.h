@@ -98,8 +98,8 @@ emmc_result_t emmc_rpmb_read_data(u16 address, u8 *data, u16 block_count);
 /* RPMB Constants */
 #define EMMC_RPMB_BLOCK_SIZE		256
 #define EMMC_RPMB_KEY_SIZE			32
-#define EMMC_RPMB_METADATA_SIZE	 28	 /* Size of metadata from nonce to req_resp (16+4+2+2+2+2) */
-#define EMMC_RPMB_HMAC_DATA_SIZE	284	/* Size of data+metadata for HMAC (256+28) */
+#define EMMC_RPMB_METADATA_SIZE	 30	 /* Size of metadata from nonce to req_resp (16+4+2+2+2+2+2) per JESD84-B51 */
+#define EMMC_RPMB_HMAC_DATA_SIZE	286	/* Size of data+metadata for HMAC (256+30) per JESD84-B51 */
 #define EMMC_RPMB_MAC_SIZE			32
 #define EMMC_RPMB_NONCE_SIZE		16
 #define EMMC_RPMB_MAX_BLOCKS		32	 /* Maximum blocks per RPMB transaction */
